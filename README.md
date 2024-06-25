@@ -16,5 +16,3 @@ Datasets can be downloaded in NetCDF format from {link}. Detailed dataset docume
 
 ## Contact
 For questions or inquiries about the SESAME project, please contact [eric.galbraith@mcgill.ca](mailto:eric.galbraith@mcgill.ca).
-# SESAME
-# SESAME
