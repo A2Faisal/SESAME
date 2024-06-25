@@ -1,0 +1,10 @@
+{
+  "file_paths": {
+    "grid_area_1deg": "../src/grid_area_1deg.nc",
+    "grid_area_0_5deg": "../src/grid_area_0_5deg.nc",
+    "grid_area_0_25deg": "../src/grid_area_0_25deg.nc",
+    "Country_Fraction.1deg": "../src/country_fraction.1deg.2000-2023.a.nc",
+    "Country_Fraction.0_5deg": "..src/Country_Fraction.0_5deg.2000-2023.nc",
+    "ISO3_Country_Continent_UN": "../src/ISO3_Country_Continent_UN.csv"
+  }
+}
