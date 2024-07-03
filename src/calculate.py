@@ -2,7 +2,9 @@ import os
 import numpy as np
 import utils
 import xarray as xr
+import pandas as pd
 import sys
+
 
 
 def calculate_length(sd, shape_file_path):
@@ -193,4 +195,231 @@ def calculate_fold_function(fold_function, ds_var):
         sys.exit(1)
     return data
 
+
+def sum_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+    if dataset is None and netcdf_directory is None:
+        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
+    elif dataset is not None and netcdf_directory is not None:
+        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
+    
+    if netcdf_directory:
+        dataset = xr.load_dataset(netcdf_directory)
+    
+    if time is not None:
+        dataset = dataset.sel(time=time, method='nearest')
+        
+    if variables is None:
+        variables = [var for var in list(dataset.data_vars) if not var.startswith("grid_area")]
+    
+    # Ensure all specified variables are in the dataset
+    for var in variables:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
+    
+    # Fill NaNs with zero before summing
+    filled_vars = [dataset[var].fillna(0) for var in variables]
+    
+    # Sum the specified variables
+    summed_data = sum(filled_vars)
+    
+    # Convert resulting zeros back to NaNs
+    summed_data = summed_data.where(summed_data != 0, other=np.nan)
+    
+    if new_variable_name:
+        # Create a new dataset with the summed variable
+        summed_dataset = xr.Dataset({new_variable_name: summed_data})
+    else:
+        summed_dataset = xr.Dataset({'summed_variable': summed_data})
+    
+    if time is not None:
+        time_coord = pd.to_datetime(time)
+        summed_dataset = summed_dataset.expand_dims(time=[time_coord])
+    
+    return summed_dataset
+
+
+
+def subtract_variables(variable1, variable2, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+    
+    if dataset is None and netcdf_directory is None:
+        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
+    elif dataset is not None and netcdf_directory is not None:
+        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
+    
+    if netcdf_directory:
+        dataset = xr.load_dataset(netcdf_directory)
+        
+    if time is not None:
+        dataset = dataset.sel(time=time, method='nearest')
+        
+    # Ensure both specified variables are in the dataset
+    if variable1 not in dataset or variable2 not in dataset:
+        raise ValueError(f"Both variables '{variable1}' and '{variable2}' must be present in the dataset.")
+    
+    # Fill NaNs with zero before subtracting
+    filled_variable1 = dataset[variable1].fillna(0)
+    filled_variable2 = dataset[variable2].fillna(0)
+    
+    # Subtract variable2 from variable1
+    result_data = filled_variable1 - filled_variable2
+    
+    # Convert resulting zeros back to NaNs
+    result_data = result_data.where(result_data != 0, other=np.nan)
+    
+    if new_variable_name:
+        # Create a new dataset with the resulting variable
+        result_dataset = xr.Dataset({new_variable_name: result_data})
+    else:
+        result_dataset = xr.Dataset({'result_variable': result_data})
+    
+    if time is not None:
+        time_coord = pd.to_datetime(time)
+        result_dataset = result_dataset.expand_dims(time=[time_coord])
+    
+    return result_dataset
+
+
+def divide_variables(variable1, variable2, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+    
+    if dataset is None and netcdf_directory is None:
+        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
+    elif dataset is not None and netcdf_directory is not None:
+        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
+
+    if netcdf_directory:
+        dataset = xr.load_dataset(netcdf_directory)
+        
+    if time is not None:
+        dataset = dataset.sel(time=time, method='nearest')
+        
+    # Ensure both specified variables are in the dataset
+    if variable1 not in dataset or variable2 not in dataset:
+        raise ValueError(f"Both variables '{variable1}' and '{variable2}' must be present in the dataset.")
+    
+    # Fill NaNs with zero before dividing
+    filled_variable1 = dataset[variable1].fillna(0)
+    filled_variable2 = dataset[variable2].fillna(0)
+    
+    # Divide variable1 by variable2
+    with np.errstate(divide='ignore', invalid='ignore'):
+        result_data = xr.where(filled_variable2 != 0, filled_variable1 / filled_variable2, np.nan)
+    
+    # Convert resulting zeros back to NaNs
+    result_data = result_data.where(result_data != 0, other=np.nan)
+    
+    if new_variable_name:
+        # Create a new dataset with the resulting variable
+        result_dataset = xr.Dataset({new_variable_name: result_data})
+    else:
+        result_dataset = xr.Dataset({'result_variable': result_data})
+    
+    if time is not None:
+        time_coord = pd.to_datetime(time)
+        result_dataset = result_dataset.expand_dims(time=[time_coord])
+    
+    return result_dataset
+
+
+def multiply_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+    
+    if dataset is None and netcdf_directory is None:
+        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
+    elif dataset is not None and netcdf_directory is not None:
+        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
+        
+    if netcdf_directory:
+        dataset = xr.load_dataset(netcdf_directory)
+        
+    if time is not None:
+        dataset = dataset.sel(time=time, method='nearest')
+    
+    if variables is None:
+        variables = [var for var in list(dataset.data_vars) if not var.startswith("grid_area")]
+    
+    # Ensure all specified variables are in the dataset
+    for var in variables:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
+    
+    # Fill NaNs with one before multiplying
+    filled_vars = [dataset[var].fillna(0) for var in variables]
+    
+    # Multiply the specified variables
+    product_data = filled_vars[0]
+    for var in filled_vars[1:]:
+        product_data *= var
+    
+    # Convert resulting ones back to NaNs
+    product_data = product_data.where(product_data != 0, other=np.nan)
+    
+    if new_variable_name:
+        # Create a new dataset with the resulting variable
+        product_dataset = xr.Dataset({new_variable_name: product_data})
+    else:
+        product_dataset = xr.Dataset({'product_variable': product_data})
+    
+    if time is not None:
+        time_coord = pd.to_datetime(time)
+        product_dataset = product_dataset.expand_dims(time=[time_coord])
+    
+    return product_dataset
+
+
+def average_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+    """
+    Average specified variables in the xarray dataset. If no variables are specified, average all variables
+    except those starting with 'grid_area'. Fill NaNs with zero before averaging, and convert resulting
+    zeros back to NaNs.
+    
+    Parameters:
+    - variables: list of str, the names of the variables to average. If None, average all variables except those
+                 starting with 'grid_area'.
+    - dataset: xarray.Dataset, optional, the dataset containing the variables.
+    - new_variable_name: str, optional, the name of the new variable to store the average.
+    - time: optional, a specific time slice to select from the dataset.
+    - netcdf_directory: str, optional: directory where netcdf file is located.
+    
+    Returns:
+    - xarray.Dataset, with the averaged variable.
+    """
+    
+    if dataset is None and netcdf_directory is None:
+        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
+    elif dataset is not None and netcdf_directory is not None:
+        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
+   
+    if netcdf_directory:
+        dataset = xr.load_dataset(netcdf_directory)
+        
+    if time is not None:
+        dataset = dataset.sel(time=time, method='nearest')
+        
+    if variables is None:
+        variables = [var for var in list(dataset.data_vars) if not var.startswith("grid_area")]
+    
+    # Ensure all specified variables are in the dataset
+    for var in variables:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
+    
+    # Fill NaNs with zero before averaging
+    filled_vars = [dataset[var].fillna(0) for var in variables]
+    
+    # Calculate the average of the specified variables
+    averaged_data = sum(filled_vars) / len(filled_vars)
+    
+    # Convert resulting zeros back to NaNs
+    averaged_data = averaged_data.where(averaged_data != 0, other=np.nan)
+    
+    if new_variable_name:
+        # Create a new dataset with the averaged variable
+        averaged_dataset = xr.Dataset({new_variable_name: averaged_data})
+    else:
+        averaged_dataset = xr.Dataset({'averaged_variable': averaged_data})
+    
+    if time is not None:
+        time_coord = pd.to_datetime(time)
+        averaged_dataset = averaged_dataset.expand_dims(time=[time_coord])
+    
+    return averaged_dataset
 

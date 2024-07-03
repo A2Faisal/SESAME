@@ -31,8 +31,7 @@ def to_tif(sd, netcdf_path, netcdf_variable, out_tif_path, time):
         raster_layer = str(netcdf_variable)
         sd.arcpy.md.MakeMultidimensionalRasterLayer(in_multidimensional_raster=netcdf_path,
                                                     out_multidimensional_raster_layer=raster_layer,
-                                                    variables=[netcdf_variable],
-                                                    dimension_def="ALL")
+                                                    variables=[netcdf_variable])
 
         output_raster = out_tif_path + raster_layer + ".tif"
         sd.arcpy.management.CopyRaster(raster_layer, out_rasterdataset=output_raster)
@@ -194,7 +193,7 @@ def da_to_ds(sd, da, short_name, long_name, units, source, time, cell_size, zero
     return ds
 
 
-def regridded_tif_2_ds(sd, raster_path, short_name, long_name, units, source, time, cell_size, zero_is_value):
+def regridded_tif_2_ds(sd, raster_path, short_name, long_name, units, source, time, cell_size, zero_is_value=False):
     ds = xr.open_dataset(raster_path)  # Open into an xarray.DataArray
     ds = ds.astype(np.float64).isel(band=0).drop_vars(['band', 'spatial_ref']).rename({'x': 'lon', 'y': 'lat'})
 
@@ -489,8 +488,8 @@ def save_to_nc(output_directory, output_filename, time, ds, base_filename):
                 ds.to_netcdf(output_directory + output_filename + ".nc")
             else:
                 ds.to_netcdf(output_directory + base_filename + ".nc")
-
-
+                
+                
 def delete_temporary_folder(folder_path):
     import shutil
     import os
