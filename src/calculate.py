@@ -366,22 +366,6 @@ def multiply_variables(variables=None, dataset=None, new_variable_name=None, tim
 
 
 def average_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
-    """
-    Average specified variables in the xarray dataset. If no variables are specified, average all variables
-    except those starting with 'grid_area'. Fill NaNs with zero before averaging, and convert resulting
-    zeros back to NaNs.
-    
-    Parameters:
-    - variables: list of str, the names of the variables to average. If None, average all variables except those
-                 starting with 'grid_area'.
-    - dataset: xarray.Dataset, optional, the dataset containing the variables.
-    - new_variable_name: str, optional, the name of the new variable to store the average.
-    - time: optional, a specific time slice to select from the dataset.
-    - netcdf_directory: str, optional: directory where netcdf file is located.
-    
-    Returns:
-    - xarray.Dataset, with the averaged variable.
-    """
     
     if dataset is None and netcdf_directory is None:
         raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
