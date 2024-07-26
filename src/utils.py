@@ -1,97 +1,959 @@
 import os
+import re
+import geopandas as gpd
 import pandas as pd
+from shapely.geometry import Polygon, LineString, Point
+import pyproj
 import numpy as np
 import xarray as xr
 import rasterio
-import process_data
-import calculate
+from rasterio.warp import calculate_default_transform, reproject, Resampling
+from rasterio.crs import CRS
+from rasterio.transform import from_bounds
+from rasterio.transform import from_origin
+from pyproj import CRS, Transformer
+from shapely.geometry import box
+
+import warnings
 import create
-import sys
-import json
+import calculate
+import get
+
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
+
+global_attr = {'Project': 'Surface Earth System Analysis and Modeling Environment (SESAME)',
+               'Research Group': 'Integrated Earth System Dynamics',
+               'Institution': 'McGill University',
+               'Contact': 'eric.galbraith@mcgill.ca',
+               'Data Version': 'V1.0'}
+
+def replace_special_characters(value):
+    """
+    Replace special characters in a string with underscores and clean up consecutive underscores.
+
+    Parameters:
+    -----------
+    value : str
+        Input string containing special characters.
+
+    Returns:
+    --------
+    cleaned_value : str
+        Cleaned string with special characters replaced by underscores and consecutive underscores removed.
+    """
+
+    value = re.sub(r'[^\w]', '_', value)
+    cleaned_value = re.sub(r'[_\s]+', '_', value)
+    cleaned_value = cleaned_value.lower()
+
+    return cleaned_value
+
+
+def reverse_replace_special_characters(value):
+    """
+    Replace underscores with white spaces and capitalize each word.
+
+    Parameters:
+    -----------
+    value : str
+        Input string containing underscored characters.
+
+    Returns:
+    --------
+    reversed_value : str
+        Cleaned string with capitalized words.
+    """
+    parts = value.split('_')
+    capitalized_parts = [part.capitalize() for part in parts]
+    reversed_value = ' '.join(capitalized_parts)
+    return reversed_value
 
 
 
-def to_tif(sd, netcdf_path, netcdf_variable, out_tif_path, time):
-    if time is not None:
-        formatted_time = process_data.change_datetime_format(time)
-        raster_layer = str(netcdf_variable) + "_" + time[:4]
-        # Create a multidimensional raster layer with specified time
-        sd.arcpy.md.MakeMultidimensionalRasterLayer(
-            in_multidimensional_raster=netcdf_path,
-            out_multidimensional_raster_layer=raster_layer,
-            variables=[netcdf_variable], dimension_def="BY_VALUE",
-            dimension_ranges=[],
-            dimension_values=[["StdTime", formatted_time]],
-            dimension="", dimensionless="NO_DIMENSIONS", spatial_reference="")
-        output_raster = out_tif_path + raster_layer + ".tif"
-        # Save the raster layer to a TIFF file
-        sd.arcpy.management.CopyRaster(raster_layer, out_rasterdataset=output_raster)
+def adjust_points(points_gdf, polygons_gdf, x_offset=0.0001, y_offset=0.0001):
+    adjusted_points = []
+    # Create the spatial index for the polygons
+    sindex = polygons_gdf.sindex
+
+    for idx, point in points_gdf.iterrows():
+        adjusted_point = point['geometry']
+        # Create a bounding box around the point
+        bbox = point['geometry'].buffer(1e-14).bounds
+        # Get the indices of the polygons that intersect with the bounding box
+        possible_matches_index = list(sindex.intersection(bbox))
+        # Get the corresponding polygons
+        possible_matches = polygons_gdf.iloc[possible_matches_index]
+        # Check if the point is within any of the possible match polygons
+        point_within_polygon = possible_matches.contains(point['geometry']).any()
+        if not point_within_polygon:
+            adjusted_point = Point(point['geometry'].x + x_offset, point['geometry'].y + y_offset)
+        adjusted_points.append(adjusted_point)
+    
+    points_gdf['geometry'] = adjusted_points
+    return points_gdf
+
+def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function='sum', x_offset=0.0001, y_offset=0.0001):
+    # Adjust points to ensure they are within or correctly intersecting polygons
+    points_gdf = adjust_points(points_gdf, polygons_gdf, x_offset, y_offset)
+    
+    # Perform spatial join with 'intersects' operation
+    points_within_polygons = gpd.sjoin(points_gdf, polygons_gdf, op='intersects')
+    
+    # If field_name is provided, convert the column to numeric
+    if fold_field:
+        points_within_polygons[fold_field] = pd.to_numeric(points_within_polygons[fold_field], errors='coerce')
+        variable_name = replace_special_characters(fold_field)
+        # Group by polygon and compute summary statistic based on operation
+        if fold_function.lower() == 'sum':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].sum().reset_index(name=variable_name)
+        elif fold_function.lower() == 'mean':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].mean().reset_index(name=variable_name)
+        elif fold_function.lower() == 'max':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].max().reset_index(name=variable_name)
+        elif fold_function.lower() == 'std':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].std().reset_index(name=variable_name)
+        else:
+            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+    
+        # Merge summary statistics with polygons GeoDataFrame
+        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_index=True, right_on='index_right')
+    
     else:
-        # Create a raster layer without a specific time
-        raster_layer = str(netcdf_variable)
-        sd.arcpy.md.MakeMultidimensionalRasterLayer(in_multidimensional_raster=netcdf_path,
-                                                    out_multidimensional_raster_layer=raster_layer,
-                                                    variables=[netcdf_variable])
+        # Count the points within each polygon
+        polygon_counts = points_within_polygons.groupby('index_right').size().reset_index(name='count')
+        # Add the count to the polygons GeoDataFrame
+        polygons_gdf['count'] = polygons_gdf.index.to_series().map(polygon_counts.set_index('index_right')['count']).fillna(0).astype(int)
+    
+    return polygons_gdf
 
-        output_raster = out_tif_path + raster_layer + ".tif"
-        sd.arcpy.management.CopyRaster(raster_layer, out_rasterdataset=output_raster)
+
+def add_variable_attributes(ds, variable_name, long_name, units, source=None, time=None, cell_size=1, value_per_area=False, zero_is_value=False):
+    """
+    Adds attributes to a variable in an xarray Dataset.
+    
+    Parameters:
+    - ds: xarray.Dataset
+        The dataset containing the variable.
+    - variable_name: str
+        The name of the variable to add attributes to.
+    - long_name: str
+        The long name of the variable.
+    - units: str
+        The units of the variable.
+    - source: str, optional
+        The source of the data.
+        
+    Returns:
+    - ds: xarray.Dataset
+        The dataset with updated variable attributes.
+    """
+    if variable_name not in ds:
+        raise ValueError(f"Variable '{variable_name}' not found in the dataset.")
+    
+    ## add lat and lon attributes
+    lon_attr = {"units" : "degrees_east",
+            "modulo" : 360.,
+            "point_spacing" : "even",
+            "axis" : "X"}
+
+    lat_attr = {"units" : "degrees_north",
+                "point_spacing" : "even",
+                "axis" : "Y"}
+
+
+    ds['lat'].attrs = lat_attr
+    ds['lon'].attrs = lon_attr
+    
+    # Add time dimension if provided
+    if time is not None:
+        time_d = pd.to_datetime(time)
+        ds = ds.assign_coords(time=time_d)
+        ds = ds.expand_dims(dim='time')
+        time_attr = {
+            "standard_name": "time",
+            "axis": "T"}
+        ds['time'].attrs = time_attr
+
+    if zero_is_value and zero_is_value.upper() == "YES":
+        ds = ds
+    else:
+        # Replace the 0 values to NaN, where zero shows evidence of absence.
+        ds[variable_name] = ds[variable_name].where(ds[variable_name] != 0, np.nan)
+
+    # add grid area variable
+    grid_ds = create.create_global_xarray_dataset(pixel_width_deg=cell_size, pixel_height_deg=cell_size)
+    ds = xr.merge([ds, grid_ds])
+    if value_per_area:
+        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+        
+    # Add variable metadata
+    attrs = {'long_name': long_name, 'units': units}
+    if source is not None:
+        attrs['source'] = source
+        
+    ds[variable_name].attrs = attrs
+    # Set and add global attributes
+    ds.attrs = global_attr
+    
+    return ds
+
+def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, source=None, time=None, variable_name=None, cell_size=1, value_per_area=False, zero_is_value=False):
+    # Extract latitudes and longitudes from the geometry column
+    polygon_gdf['lon'] = polygon_gdf['geometry'].centroid.x
+    polygon_gdf['lat'] = polygon_gdf['geometry'].centroid.y
+    
+    # Define the x and y coordinates centered on -89.5 to +89.5 and -179.5 to +179.5
+    lons = np.arange(-179.5, 180, cell_size)
+    lats = np.arange(-89.5, 90, cell_size) [::-1]
+    
+    # Create a meshgrid of coordinates
+    lon_mesh, lat_mesh = np.meshgrid(lons, lats)
+    
+    # Create a mask using the GeoDataFrame
+    mask = np.zeros_like(lon_mesh, dtype=np.float64)
+    
+    # Iterate through each row in the GeoDataFrame
+    for idx, row in polygon_gdf.iterrows():
+        lon_idx = np.where(lons == row['lon'])[0]
+        lat_idx = np.where(lats == row['lat'])[0]
+        mask[lat_idx, lon_idx] = row[grid_value] 
+    
+    if variable_name:
+        variable_name = replace_special_characters(variable_name)
+        # Create an xarray dataset
+        ds = xr.Dataset({
+                variable_name: (['lat', 'lon'], mask)},
+                coords={'lat': (['lat'], lats),
+                'lon': (['lon'], lons)})
+        ds = add_variable_attributes(ds=ds, variable_name=variable_name, long_name=long_name, 
+                                     units=units, source=source, time=time, cell_size=cell_size, value_per_area=value_per_area, zero_is_value=zero_is_value)
+        
+    else:
+        grid_value = replace_special_characters(grid_value)
+        ds = xr.Dataset({
+                grid_value: (['lat', 'lon'], mask)},
+                coords={'lat': (['lat'], lats),
+                'lon': (['lon'], lons)})
+
+        ds = add_variable_attributes(ds=ds, variable_name=grid_value, long_name=long_name, 
+                                     units=units, source=source, time=time, cell_size=cell_size, value_per_area=value_per_area, zero_is_value=zero_is_value)
+
+    return ds
+
+def da_to_ds(da, variable_name, long_name, units, source=None, time=None, cell_size=1, zero_is_value=False, value_per_area=False):
+    """
+    Convert a DataArray to a Dataset including additional metadata and attributes.
+
+    Parameters
+    ----------
+    da : xarray.DataArray
+        The input DataArray to be converted.
+    short_name : str
+        Name of the variable.
+    long_name : str
+        A long name for the variable.
+    units : str
+        Units of the variable.
+    source : str, optional
+        Source information, if available. Default is None.
+    time : str or None, optional
+        Time information. If provided and not 'recent', a time dimension is added to the dataset.
+        Default is None.
+    cell_size : float, optional
+        Grid cell size for latitude and longitude bounds calculations. Default is 1.
+
+    Returns
+    -------
+    xarray.Dataset
+        The converted Dataset with added coordinates, attributes, and global attributes.
+    """
+
+    # Convert the DataArray to a Dataset with the specified variable name
+    ds = da.to_dataset(name=variable_name)
+
+    ## add lat and lon attributes
+    lon_attr = {"units" : "degrees_east",
+            "modulo" : 360.,
+            "point_spacing" : "even",
+            "axis" : "X"}
+
+    lat_attr = {"units" : "degrees_north",
+                "point_spacing" : "even",
+                "axis" : "Y"}
+
+
+    ds['lat'].attrs = lat_attr
+    ds['lon'].attrs = lon_attr
+    
+    # Add time dimension if provided
+    if time is not None:
+        time_d = pd.to_datetime(time)
+        ds = ds.assign_coords(time=time_d)
+        ds = ds.expand_dims(dim='time')
+        time_attr = {
+            "standard_name": "time",
+            "axis": "T"}
+        ds['time'].attrs = time_attr
+
+    if zero_is_value:
+        ds = ds
+    else:
+        # Replace the 0 values to NaN, where zero shows evidence of absence.
+        ds[variable_name] = ds[variable_name].where(ds[variable_name] != 0, np.nan)
+
+    # add grid area variable
+    cell_size = abs(float(ds['lat'].diff('lat').values[0]))
+    grid_ds = create.create_global_xarray_dataset(pixel_width_deg=cell_size, pixel_height_deg=cell_size)
+    ds = xr.merge([ds, grid_ds])
+    if value_per_area:
+        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+        
+    # Add variable metadata
+    attrs = {'long_name': long_name, 'units': units}
+    if source is not None:
+        attrs['source'] = source
+        
+    ds[variable_name].attrs = attrs
+    # Set and add global attributes
+    ds.attrs = global_attr
+    
+    return ds
+
+def determine_long_name_point(fold_field, variable_name, long_name, fold_function):
+    if long_name is None:
+        if fold_field is None or (fold_function is not None and fold_function.lower() == 'sum'):
+            return reverse_replace_special_characters(variable_name) if variable_name else "count"
+    return long_name if long_name else "count"
+
+
+def determine_units_line(units, value_per_area):
+    if units == "meter/grid-cell" and value_per_area:
+        return "m m-2"
+    return units
+
+def determine_long_name_line(fold_field, variable_name, long_name, fold_function):
+    if long_name is None:
+        if fold_field is None or (fold_function is not None and fold_function.lower() == 'sum'):
+            return reverse_replace_special_characters(variable_name) if variable_name else reverse_replace_special_characters(f"length_{fold_function.lower()}")
+    return long_name if long_name else reverse_replace_special_characters(f"length_{fold_function.lower()}")
+
+def determine_long_name_line(long_name, fold_field, variable_name):
+    if long_name is None:
+        if variable_name:
+            long_name = reverse_replace_special_characters(variable_name)
+        else:
+            long_name = reverse_replace_special_characters(fold_field)
+    return long_name
+        
+
+def dataframe_stats_line(dataframe, fold_field=None, fold_function="sum", verbose=False):
+    if fold_function.lower() == "sum":
+        if fold_field is None or fold_field == "length_sum":
+            dataframe = calculate.calculate_geometry_attributes(dataframe)
+            global_summary_stats = dataframe['length_m'].sum()
+            if verbose:
+                print(f"Global stats before gridding: {global_summary_stats:.2f}")
+            return global_summary_stats
+    else:
+        raise ValueError(f"Unsupported fold_function: {fold_function}. Choose 'sum'. or set verbose=False")
+    
+def determine_units_poly(units, value_per_area, fraction):
+    if fraction:
+        if fraction and not value_per_area:
+            return "fraction"
+        if fraction and value_per_area:
+            raise ValueError("Fraction and value per area cannot be created together.")
+    elif value_per_area:
+        units = "m2 m-2"
+    return units
+    
+
+def determine_long_name_poly(variable_name, long_name, fold_function):
+    if long_name is None:
+        if variable_name is None or (fold_function is not None and fold_function.lower() == 'sum'):
+            return reverse_replace_special_characters(variable_name) if variable_name else "area"
+    return long_name if long_name else "area"
+
+
+def dataframe_stats_poly(dataframe, fold_function="sum"):
+    if fold_function.lower() == "sum":
+        dataframe = calculate.calculate_geometry_attributes(dataframe)
+        global_summary_stats = dataframe['area_m2'].sum()
+        return global_summary_stats * 1e-6
+    else:
+        raise ValueError(f"Unsupported fold_function: {fold_function}. Choose 'sum'. or set verbose=False")
+    
+
+def determine_units_point(units, value_per_area):
+    if units == "value/grid-cell" and value_per_area:
+        return "value m-2"
+    return units
+
+
+def dataframe_stats_point(dataframe, fold_field=None, fold_function="sum"):
+    if fold_field is None or fold_field == "count":
+        if fold_function is None or fold_function.lower() == 'sum':
+            global_summary_stats = len(dataframe)
+        else:
+            raise ValueError(f"Unsupported fold_function: {fold_function}")
+    elif fold_function is not None and fold_function.lower() == 'sum' and fold_field is not None:
+        global_summary_stats = dataframe[fold_field].sum()
+    else:
+        raise ValueError(f"Unsupported combination of fold_field: {fold_field} and fold_function: {fold_function}")
+    return global_summary_stats
+
+# def xarray_dataset_stats(dataset, variable_name, value_per_area=False):
+#     if value_per_area:
+#         global_gridded_stats = (dataset[variable_name] * dataset["grid_area"]).sum().item()
+#     else:
+#         global_gridded_stats = (dataset[variable_name]).sum().item()
+#     return global_gridded_stats * 1e-6
+
+# def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per_area=False):
+#     if variable_name is None and fold_field:
+#         variable_name = fold_field
+#     elif variable_name and fold_field:
+#         variable_name = variable_name
+#     if value_per_area:
+#         global_gridded_stats = (dataset[variable_name] * dataset["grid_area"]).sum().item()
+#     else:
+#         global_gridded_stats = (dataset[variable_name]).sum().item()
+#     return global_gridded_stats
+
+def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per_area=None):
+    if variable_name is None and fold_field:
+        variable_name = fold_field
+    elif variable_name and fold_field:
+        variable_name = variable_name
+    if value_per_area:
+        global_gridded_stats = (dataset[variable_name] * dataset["grid_area"]).sum().item()
+    else:
+        global_gridded_stats = (dataset[variable_name]).sum().item()
+    return global_gridded_stats * 1e-6
+
+def save_to_nc(ds, output_directory=None, output_filename=None, base_filename=None):
+    if output_directory != None:
+        if output_filename != None:
+            ds.to_netcdf(output_directory + output_filename + ".nc")
+        else:
+            ds.to_netcdf(output_directory + base_filename + ".nc")
+            
+
+def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'):
+    # Ensure both GeoDataFrames use the same CRS
+    if polygons_gdf.crs != lines_gdf.crs:
+        lines_gdf = lines_gdf.to_crs(polygons_gdf.crs)
+    
+    # Add index columns to preserve original indices
+    polygons_gdf = polygons_gdf.reset_index().rename(columns={'index': 'polygon_index'})
+    lines_gdf = lines_gdf.reset_index().rename(columns={'index': 'line_index'})
+    
+    # Calculate the intersection between polygons and lines
+    intersections = gpd.overlay(lines_gdf, polygons_gdf, how='intersection')
+
+    # Calculate the length of each intersected line segment
+    intersections = calculate.calculate_geometry_attributes(intersections)
+
+    # If fold_field is provided, convert the column to numeric
+    if fold_field:
+        intersections[fold_field] = pd.to_numeric(intersections[fold_field], errors='coerce')
+        variable_name = replace_special_characters(fold_field)
+        # Group by polygon and compute summary statistic based on operation
+        if fold_function.lower() == 'sum':
+            summary_stats = intersections.groupby('polygon_index')[fold_field].sum().reset_index(name=variable_name)
+        elif fold_function.lower() == 'mean':
+            summary_stats = intersections.groupby('polygon_index')[fold_field].mean().reset_index(name=variable_name)
+        elif fold_function.lower() == 'max':
+            summary_stats = intersections.groupby('polygon_index')[fold_field].max().reset_index(name=variable_name)
+        elif fold_function.lower() == 'std':
+            summary_stats = intersections.groupby('polygon_index')[fold_field].std().reset_index(name=variable_name)
+        else:
+            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+    
+    else:
+        # Group by the polygon index and apply the fold function to the intersection lengths
+        if fold_function.lower() == 'sum':
+            summary_stats = intersections.groupby('polygon_index')['length_m'].sum().reset_index(name='length_sum')
+        elif fold_function.lower() == 'mean':
+            summary_stats = intersections.groupby('polygon_index')['length_m'].mean().reset_index(name='length_mean')
+        elif fold_function.lower() == 'max':
+            summary_stats = intersections.groupby('polygon_index')['length_m'].max().reset_index(name='length_max')
+        elif fold_function.lower() == 'std':
+            summary_stats = intersections.groupby('polygon_index')['length_m'].std().reset_index(name='length_std')
+        else:
+            raise ValueError(f"Unsupported fold_function: {fold_function}. Choose from 'sum', 'mean', 'max', 'std'.")
+    
+    # Merge summary statistics with polygons GeoDataFrame
+    polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_on='polygon_index', right_on='polygon_index')
+    return polygons_gdf
+
+
+def poly_intersect(polygons_gdf, poly_gdf, fold_function='sum', fraction=False):
+    # Ensure both GeoDataFrames use the same CRS
+    if polygons_gdf.crs != poly_gdf.crs:
+        poly_gdf = poly_gdf.to_crs(polygons_gdf.crs)
+        
+    before = calculate.calculate_geometry_attributes(poly_gdf)
+    print(before["area_m2"].sum())
+    
+    # Calculate the intersection between polygons and poly_gdf
+    intersections = gpd.overlay(poly_gdf, polygons_gdf, how='intersection')
+
+    # Calculate the geometry attributes for intersections
+    intersections = calculate.calculate_geometry_attributes(intersections)
+    print(intersections["area_m2"].sum())
+    
+    
+    if fraction:
+        # Always calculate the total area
+        total_area_stats = intersections.groupby('id')['area_m2'].sum().reset_index(name='total_area')
+        # Calculate the geometry attributes for the original polygons
+        poly_gdf = calculate.calculate_geometry_attributes(poly_gdf)
+        polygons_gdf = calculate.calculate_geometry_attributes(polygons_gdf)
+        
+        # Calculate the fraction of the area of each intersected polygon
+        intersections = intersections.merge(
+            polygons_gdf[['id', 'area_m2']], 
+            on='id', 
+            suffixes=('', '_grid')
+        )
+        intersections['frac'] = intersections['area_m2'] / intersections['area_m2_grid']
+        
+        # Apply fold_function to the fraction column
+        if fold_function.lower() == 'sum':
+            summary_stats = intersections.groupby('id')['frac'].sum().reset_index(name="frac")
+        elif fold_function.lower() == 'mean':
+            summary_stats = intersections.groupby('id')['frac'].mean().reset_index(name="frac")
+        elif fold_function.lower() == 'max':
+            summary_stats = intersections.groupby('id')['frac'].max().reset_index(name="frac")
+        elif fold_function.lower() == 'std':
+            summary_stats = intersections.groupby('id')['frac'].std().reset_index(name="frac")
+        else:
+            raise ValueError(f"Unsupported operation: {fold_function}. Choose from 'sum', 'mean', 'max', 'std'.")
+        
+        summary_stats['frac'] = summary_stats['frac'].clip(upper=1)
+        summary_stats = summary_stats.merge(total_area_stats, how='left', on='id')
+        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_on='id', right_on='id')
+    else:
+        # Group by the polygon index and apply the fold function to the intersection areas
+        if fold_function.lower() == 'sum':
+            summary_stats = intersections.groupby('id')['area_m2'].sum().reset_index(name='area_sum')
+        elif fold_function.lower() == 'mean':
+            summary_stats = intersections.groupby('id')['area_m2'].mean().reset_index(name='area_mean')
+        elif fold_function.lower() == 'max':
+            summary_stats = intersections.groupby('id')['area_m2'].max().reset_index(name='area_max')
+        elif fold_function.lower() == 'std':
+            summary_stats = intersections.groupby('id')['area_m2'].std().reset_index(name='area_std')
+        else:
+            raise ValueError(f"Unsupported fold_function: {fold_function}. Choose from 'sum', 'mean', 'max', 'std'.")
+        
+        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_on='id', right_on='id')
+    
+    return polygons_gdf
+
+
+def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
+    """
+    Convert NetCDF data to a TIFF file. Handles multidimensional data and specific times.
+    Ensures proper projection and cell size.
+
+    Parameters
+    ----------
+    netcdf_path : str
+        File path to the NetCDF data.
+    netcdf_variable : str
+        Variable in the NetCDF data to be converted.
+    temp_path : str
+        Temporary path to save the TIFF file.
+    time : str or None, optional
+        Specific time for the conversion in the format YYYY-MM-DD. Default is None.
+
+    Returns
+    -------
+    str
+        File path to the generated TIFF file.
+    """
+    # create a temp path
+    temp_path = create.create_temp_folder(netcdf_path, folder_name="temp")
+    
+    # Open the NetCDF file with xarray
+    ds = xr.open_dataset(netcdf_path)
+    
+    # Select the variable
+    data = ds[netcdf_variable]
+    
+    # Handle multidimensional data and specific time
+    if time is not None:
+        data = data.sel(time=time, method="nearest").drop_vars("time")
+    
+    # Extract the data array
+    array = data.values
+    
+    # identify lat, lon variables
+    x_dimension, y_dimension = get.identify_lat_lon_names(netcdf_path)
+    # Extract latitude and longitude from dataset
+    lon = ds[x_dimension].values
+    lat = ds[y_dimension].values
+    
+    # Shift the prime meridian to Greenwich if the raw longitude is defined otherwise
+    if lon.min() >= 0 and lon.max() > 180:
+        lon = lon - 180
+        # Shift the data array to match the new longitude values
+        shift_index = np.where(lon >= 0)[0][0]
+        array = np.roll(array, shift_index, axis=1)
+    
+    # Get dimensions
+    height, width = array.shape
+    
+    # Calculate transform based on extent and cell size
+    min_lon, max_lon = lon.min(), lon.max()
+    min_lat, max_lat = lat.min(), lat.max()
+
+    if lat[0] < lat[-1]:
+        lat = np.flip(lat)
+        array = np.flipud(array)  # Flip the array vertically to match the lat reversal
+    
+    transform = from_origin(min_lon, max_lat, (max_lon - min_lon) / width, (max_lat - min_lat) / height)
+
+    # Prepare for writing the TIFF file
+    metadata = {
+        'driver': 'GTiff',
+        'count': 1,
+        'dtype': str(array.dtype),
+        'width': width,
+        'height': height,
+        'crs': CRS.from_epsg(4326).to_wkt(),
+        'transform': transform
+    }
+    
+    # Generate the output TIFF path
+    raster_layer = f"{netcdf_variable}_{time[:10] if time else ''}.tif"
+    output_raster = os.path.join(temp_path, raster_layer)
+    
+    # Write the data to a TIFF file
+    with rasterio.open(output_raster, 'w', **metadata) as dst:
+        dst.write(array, 1)
+    
     return output_raster
 
 
-def from_tif(sd, in_tif_path, temp_path, short_name, long_name, units, source, cell_size, time, zero_is_value,
-             conversion_type="SUM", verbose=False, value_per_sqm=None):
-    # Open the input raster using sd.arcpy
-    raster = sd.arcpy.Raster(in_tif_path)
 
-    cell_size = float(cell_size)
+def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
+    """
+    Reproject the input raster to WGS84 projection and fill the missing rasters as 0.
+    The output raster will also maintain the specified extent.
 
-    check_cell_size(sd, raster)
-    # Extract the base filename from the input raster path
-    base_filename = os.path.splitext(os.path.basename(in_tif_path))[0]
+    Parameters
+    ----------
+    input_raster : str
+        File path to the input raster.
+    dst_extent : tuple, optional
+        The desired output extent (minX, minY, maxX, maxY). Default is (-180.0, -90.0, 180.0, 90.0).
 
-    # Set the extent for geographic coordinates
-    with sd.arcpy.EnvManager(extent="-180 -90 180 90 GEOGCS[GCS_WGS_1984,DATUM[D_WGS_1984,SPHEROID[WGS_1984,6378137.0,298.257223563]],PRIMEM[Greenwich,0.0],UNIT[Degree,0.0174532925199433]]"):
-        # Generate the output raster path
-        output_raster = temp_path + base_filename + "_filled.tif"
-        # Fill Nodata values with 0
-        filled_raster = sd.arcpy.sa.Con(sd.arcpy.sa.IsNull(raster), 0, raster)
-        filled_raster.save(output_raster)
+    Returns
+    -------
+    np.ndarray
+        The reprojected data as a numpy array.
+    """
+    # Define the target CRS (WGS84)
+    dst_crs = CRS.from_epsg(4326)
 
-    # Open the filled raster using rasterio
-    filled_raster = temp_path + base_filename + "_filled.tif"
-    with rasterio.open(filled_raster) as src:
-        arr = src.read(1, masked=True).filled(0).astype(np.float64)
+    # Open the input raster
+    with rasterio.open(input_raster) as src:
+        # Check if the CRS of the input raster is already WGS84
+        if src.crs == dst_crs:
+            # If the CRS is already WGS84, only maintain the extent
+            src_crs = src.crs
+            src_transform = src.transform
+            src_res = (src_transform[0], src_transform[4])  # (pixel_width, pixel_height)
 
-        raw_global_value = calculate.calculate_raw_global_value(conversion_type, arr, zero_is_value)
+            # Calculate the dimensions of the output raster based on the extent and input resolution
+            dst_width = int((dst_extent[2] - dst_extent[0]) / src_res[0])
+            dst_height = int((dst_extent[3] - dst_extent[1]) / abs(src_res[1]))
 
-        # Calculate grid resolution
-        num_lat, num_lon = calculate.calculate_grid_resolution(cell_size)
-        padded_arr = calculate.calculate_padded_array(num_lat, num_lon, arr)
-        aligned_arr = calculate.calculate_aligned_array(num_lat, num_lon, padded_arr)
+            # Calculate the transform for the output raster
+            dst_transform = from_bounds(*dst_extent, dst_width, dst_height)
 
-        # Calculate the re-gridded global value based on the conversion type
-        regridded_global_value, da = calculate.calculate_regridded_global_value(conversion_type, num_lat, num_lon,
-                                                                                aligned_arr, cell_size, zero_is_value)
-        if verbose:
-            print(f"Raw global {conversion_type}: {raw_global_value:.3f}")
-            print(f"Re-gridded global {conversion_type}: {regridded_global_value:.3f}")
+            # Create an array to hold the reprojected data
+            dst_array = np.full((dst_height, dst_width), 0, dtype=src.dtypes[0])
 
-        ds = calculate.calculate_ds(sd, value_per_sqm, da, short_name, long_name, units, source, cell_size, time,
-                                    zero_is_value)
+            # Reproject each band
+            for i in range(1, src.count + 1):
+                reproject(
+                    source=rasterio.band(src, i),
+                    destination=dst_array,
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=dst_transform,
+                    dst_crs=dst_crs,
+                    resampling=Resampling.nearest,
+                    dst_nodata=0
+                )
+        else:
+            # If the CRS is not WGS84, reproject to WGS84
+            transform, width, height = calculate_default_transform(
+                src.crs, dst_crs, src.width, src.height, *src.bounds
+            )
+
+            # Create an array to hold the reprojected data
+            dst_array = np.full((height, width), 0, dtype=src.dtypes[0])
+
+            # Reproject each band
+            for i in range(1, src.count + 1):
+                reproject(
+                    source=rasterio.band(src, i),
+                    destination=dst_array,
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=transform,
+                    dst_crs=dst_crs,
+                    resampling=Resampling.nearest,
+                    dst_nodata=0
+                )
+
+            # If needed, reapply the extent based on the output of reprojection
+            # Adjust the resolution to fit the new extent
+            src_res = (transform[0], transform[4])
+            dst_width = int((dst_extent[2] - dst_extent[0]) / src_res[0])
+            dst_height = int((dst_extent[3] - dst_extent[1]) / abs(src_res[1]))
+            dst_transform = from_bounds(*dst_extent, dst_width, dst_height)
+
+            # Create a new array for the final extent
+            final_array = np.full((dst_height, dst_width), 0, dtype=dst_array.dtype)
+
+            # Reproject the already reprojected array to the new extent
+            reproject(
+                source=dst_array,
+                destination=final_array,
+                src_transform=transform,
+                src_crs=dst_crs,
+                dst_transform=dst_transform,
+                dst_crs=dst_crs,
+                resampling=Resampling.nearest,
+                dst_nodata=0
+            )
+            dst_array = final_array
+
+    return dst_array
+
+
+def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="value/grid-cell", source=None, cell_size=1,
+                     time=None, zero_is_value=None, value_per_area=False, verbose=False):
+    
+    arr = array.astype(np.float64)
+
+    # Calculate raw global value based on the conversion type
+    if fold_function.upper() == 'SUM':
+        raw_global_value = arr.sum()
+
+    # Get dimensions and calculate grid resolution
+    num_rows, num_cols = arr.shape
+    num_lat, num_lon = calculate.calculate_grid_resolution(resolution=cell_size)
+    
+    # Set a tolerance level
+    tolerance = 0.01
+    
+    # Check if the dimensions are perfectly divisible within the tolerance
+    if abs(num_rows / num_lat - round(num_rows / num_lat)) < tolerance and abs(num_cols / num_lon - round(num_cols / num_lon)) < tolerance:
+        padded_arr = arr
+    else:
+        # Calculate padding needed for the array
+        lat_padding = num_lat - (arr.shape[0] % num_lat)
+        lon_padding = num_lon - (arr.shape[1] % num_lon)
+    
+        # Distribute the padding evenly to the start and end of the array
+        lat_padding_start = lat_padding // 2
+        lat_padding_end = lat_padding - lat_padding_start
+        lon_padding_start = lon_padding // 2
+        lon_padding_end = lon_padding - lon_padding_start
+    
+        # Pad the array with zeros
+        padded_arr = np.pad(arr, ((lat_padding_start, lat_padding_end), (lon_padding_start, lon_padding_end)), mode='constant', constant_values=0)
+
+    # Calculate factors for latitude and longitude
+    lat_factor = padded_arr.shape[0] // num_lat
+    lon_factor = padded_arr.shape[1] // num_lon
+
+    aligned_arr = np.zeros((num_lat, num_lon, lat_factor, lon_factor))
+
+
+    for i in range(num_lat):
+        for j in range(num_lon):
+            lat_start = i * lat_factor
+            lat_end = (i + 1) * lat_factor
+            lon_start = j * lon_factor
+            lon_end = (j + 1) * lon_factor
+
+            aligned_arr[i, j] = padded_arr[lat_start:lat_end, lon_start:lon_end]
+
+    lat_resolution = cell_size
+    lon_resolution = cell_size
+    lat = np.linspace(90 - lat_resolution / 2, -90 + lat_resolution / 2, num=num_lat)
+    lon = np.linspace(-180 + lon_resolution / 2, 180 - lon_resolution / 2, num=num_lon)
+
+
+    # Create an xarray DataArray with dimensions and coordinates
+    da = xr.DataArray(aligned_arr, dims=("lat", "lon", "lat_factor", "lon_factor"),
+                      coords={"lat": lat, "lon": lon})
+
+    # Perform the aggregation over the lat_factor and lon_factor dimensions
+    if fold_function.upper() == 'SUM':
+        da_agg = da.sum(dim=['lat_factor', 'lon_factor'])
+    elif fold_function.upper() == 'MEAN':
+        if zero_is_value and zero_is_value.upper() == "YES":
+            da_agg = da.mean(dim=['lat_factor', 'lon_factor'])
+        else:
+            # Calculate the sum and count of non-zero values
+            da_sum = da.sum(dim=['lat_factor', 'lon_factor'])
+            da_count = da.where(da != 0).count(dim=['lat_factor', 'lon_factor'])
+            # Calculate the mean, handling division by zero
+            da_agg_nan = da_sum / da_count.where(da_count != 0, np.nan)
+            # Replace nan values with 0
+            da_agg = da_agg_nan.fillna(0)
+    elif fold_function.upper() == 'MAX':
+        da_agg = da.max(dim=['lat_factor', 'lon_factor'])
+    else:
+        raise ValueError("Conversion should be either SUM, MEAN, or MAX")
+
+    if verbose and fold_function.upper() == 'SUM':
+        print(f"Raw global {fold_function}: {raw_global_value:.3f}")
+        regridded_global_value = da_agg.sum().item()
+        print(f"Re-gridded global {fold_function}: {regridded_global_value:.3f}")
+
+    da = da_agg
+    
+    # convert dataarray to dataset
+    ds = da_to_ds(da, variable_name, long_name, units, source, time, cell_size, zero_is_value, value_per_area)
+
     return ds
 
 
-def load_country_fraction_dataset(sd, cell_size):
-    # Get the directory of the current script
-    config_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '')
 
-    if cell_size == "1" or cell_size == "1.0":
-        country_ds = xr.load_dataset(sd.config['file_paths']['Country_Fraction.1deg'])
-    elif cell_size == "0.5":
-        country_ds = xr.load_dataset(sd.config['file_paths']['Country_Fraction.0_5deg'])
+def xy_not_eq(raster_path, fold_function, variable_name, long_name, units, source=None, time=None, cell_size=1, 
+                                 value_per_area=False, zero_is_value=False):
+    # Convert raster to polygon GeoDataFrame
+    gdf = raster_to_polygon_gdf(raster_file=raster_path)
+    gdf = gdf.fillna(0)
+    gdf = calculate.calculate_geometry_attributes(input_gdf=gdf, column_name="ras_area")
+    # Create gridded polygon GeoDataFrame
+    polygons_gdf = create.create_gridded_polygon(cell_size=cell_size)
+    # Perform intersection
+    intersections = gpd.overlay(gdf, polygons_gdf, how='intersection')
+    # Calculate geometry attributes
+    intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="in_area")
+    # Calculate the fraction
+    intersections["frac"] = intersections["in_area"] / intersections["ras_area"]
+    # compute statistics
+    result_df = compute_weighted_statistics(gdf=intersections, stat=fold_function)
+    # Merge results with polygons_gdf
+    joined_gdf = polygons_gdf.merge(result_df, on='id', how='left')
+    ds = gridded_poly_2_xarray(polygon_gdf=joined_gdf, grid_value=fold_function, long_name=long_name, 
+                                 units=units, source=source, time=time, variable_name=variable_name, cell_size=cell_size, 
+                                 value_per_area=value_per_area, zero_is_value=zero_is_value)
+    return ds
+
+
+
+def raster_to_polygon_gdf(raster_file):
+    # Open the raster file
+    with rasterio.open(raster_file) as src:
+        # Read the raster to an array
+        array = src.read(1)
+        
+        # Handle nodata values
+        if src.nodata is not None:
+            mask = array != src.nodata
+        else:
+            mask = np.ones_like(array, dtype=bool)
+        
+        # Prepare lists for geometries and values
+        geometries = []
+        values = []
+        
+        # Loop through each pixel and create a polygon
+        for i in range(src.height):
+            for j in range(src.width):
+                if mask[i, j]:
+                    # Calculate the bounds of the pixel
+                    left = src.transform * (j, i)
+                    right = src.transform * (j + 1, i + 1)
+                    polygon = box(left[0], left[1], right[0], right[1])
+                    geometries.append(polygon)
+                    values.append(array[i, j])
+        
+        # Create a GeoDataFrame
+        gdf = gpd.GeoDataFrame({'geometry': geometries, 'value': values})
+        
+        # Set the CRS of the GeoDataFrame to match the raster
+        gdf.crs = src.crs
+    
+    return gdf
+
+def compute_weighted_statistics(gdf, stat='sum'):
+    if stat.lower() == 'sum':
+        result = gdf.groupby('id', as_index=False).apply(
+            lambda df: pd.Series({
+                'sum': (df['value'] * df['frac']).sum()
+            }), include_groups=False
+        ).reset_index()
+    elif stat.lower() == 'mean':
+        result = gdf.groupby('id', as_index=False).apply(
+            lambda df: pd.Series({
+                'mean': (df['value'] * df['frac']).sum() / df['frac'].sum() if df['frac'].sum() != 0 else float('nan')
+            }), include_groups=False
+        ).reset_index()
+    elif stat.lower() == 'max':
+        result = gdf.groupby('id', as_index=False).apply(
+            lambda df: pd.Series({
+                'max': (df['value'] * df['frac']).max()
+            }), include_groups=False
+        ).reset_index()
+    elif stat.lower() == 'std':
+        result = gdf.groupby('id', as_index=False).apply(
+            lambda df: pd.Series({
+                'std': (((df['value'] - ((df['value'] * df['frac']).sum() / df['frac'].sum() if df['frac'].sum() != 0 else float('nan'))) ** 2 * df['frac']).sum() / df['frac'].sum()) ** 0.5 if df['frac'].sum() != 0 else float('nan')
+            }), include_groups=False
+        ).reset_index()
     else:
-        raise ValueError("The netcdf variable should be either 1, 0.5 or 0.25 degrees in resolution.")
-    return country_ds
+        raise ValueError("Unsupported statistic specified. Choose from 'sum', 'mean', 'max', 'std'.")
+
+    return result
+
+
+def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value/grid-cell", source=None, cell_size=1,
+                     time=None, zero_is_value=None, value_per_area=False, verbose=False):
+    
+    # Step-1: Check the cell size
+    # Open the input raster using rasterio
+    with rasterio.open(input_raster) as raster:
+        # Get the X and Y cell sizes from the raster properties
+        x_size, y_size = raster.res[0], raster.res[1]
+
+        # Round and convert cell sizes to float
+        x_size = round(float(x_size), 3)
+        y_size = round(float(y_size), 3)
+
+        if verbose and fold_function.lower() == "sum":
+            raster_sum = rasterio.open(input_raster).read(1).sum()
+            print(f"Global sum before gridding {raster_sum}")
+
+        if x_size > cell_size:
+            print("TODO: downscaling needed!")
+        else:
+            if x_size != y_size:
+                ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
+                               long_name=long_name, units=units, source=source, time=time, cell_size=cell_size, 
+                               value_per_area=value_per_area, zero_is_value=zero_is_value)
+            else:
+                # reproject and fill
+                array = reproject_and_fill(input_raster)
+                # re-grid
+                ds = regrid_array_2_ds(array=array, fold_function=fold_function, variable_name=variable_name, 
+                                       long_name=long_name, units=units, source=source, cell_size=1, time=time, zero_is_value=zero_is_value,
+                                       value_per_area=value_per_area, verbose=verbose)
+    
+    return ds
 
 
 def adjust_datasets(input_ds, country_ds, time):
@@ -117,388 +979,3 @@ def adjust_datasets(input_ds, country_ds, time):
     return input_ds, country_ds, a
 
 
-def normalize_by_area(sd, cell_size, da):
-    # Get the directory of the current script
-    config_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '')
-    
-    if cell_size == "1" or cell_size == "1.0":
-        grid_ds = xr.load_dataset(sd.config['file_paths']['grid_area_1deg'])
-        da = da / grid_ds["grid_area_1deg"]
-    elif cell_size == "0.5":
-        grid_ds = xr.load_dataset(sd.config['file_paths']['grid_area_0_5deg'])
-        da = da / grid_ds["grid_area_0_5deg"]
-    elif cell_size == "0.25":
-        grid_ds = xr.load_dataset(sd.config['file_paths']['grid_area_0_25deg'])
-        da = da / grid_ds["grid_area_0_25deg"]
-    return da
-
-
-def regrid(sd, raster_path, temp_path):
-    # Open the raster dataset using sd.arcpy
-    raster = sd.arcpy.Raster(raster_path)
-    base_filename = os.path.splitext(os.path.basename(raster_path))[0]
-
-    # Get the spatial reference of the raster
-    ref = sd.arcpy.Describe(raster).SpatialReference
-    # Get the name of the coordinate system
-    coord_sys_name = sd.arcpy.env.outputCoordinateSystem.name
-
-    # Check if the coordinate system is unknown and define the coordinate system as GCS WGS 1984 if True
-    if ref.name == "Unknown":
-        raster = sd.arcpy.management.DefineProjection(raster)
-        print(f"The coordinate system of {base_filename} is defined to {coord_sys_name}.")
-    # Check if coordinate system is already the target coordinate system; if True, print the spatial reference status
-    elif ref.name == coord_sys_name:
-        print(f"The coordinate sytem of {base_filename} is already defined to {coord_sys_name}.")
-    # If a temporary path is not provided, reproject the raster to the target coordinate system
-    elif ref.name != coord_sys_name:
-        # temp_path = self._create_temp_folder(raster_path, "temp") + "/"
-        print(f"Reprojecting the raster file.")
-
-        filename = os.path.basename(raster_path)
-        with sd.arcpy.EnvManager(
-                extent="-180 -90 180 90 GEOGCS[GCS_WGS_1984,DATUM[D_WGS_1984,SPHEROID[WGS_1984,6378137.0,298.257223563]],PRIMEM[Greenwich,0.0],UNIT[Degree,0.0174532925199433]]"):
-            raster = sd.arcpy.management.ProjectRaster(raster, temp_path + filename,
-                                                    sd.arcpy.env.outputCoordinateSystem, "NEAREST", "", "", "#", "#")
-            raster_path = temp_path + filename
-            print(f"The raster file has been reprojected to {coord_sys_name}.")
-    else:
-        print(f"Projection type is not recognized!")
-    return raster_path
-
-
-def da_to_ds(sd, da, short_name, long_name, units, source, time, cell_size, zero_is_value):
-    # Convert the DataArray to a Dataset with the specified variable name
-    ds = da.to_dataset(name=short_name)
-
-    # Add time dimension to dataset if provided and not set to 'recent'
-    if time and time != 'recent':
-        time_d = pd.to_datetime(time)
-        ds = ds.assign_coords(time=time_d)
-        ds = ds.expand_dims(dim='time')
-
-    # Set variable attributes including short name, long name, units, and source if available
-    attrs = {'short_name': short_name, 'long_name': long_name, 'units': units}
-    if source is not None:
-        attrs['source'] = source
-
-    ds[short_name].attrs = attrs
-    ds['lat'].attrs, ds['lon'].attrs = get_lat_lon_attrs()
-
-    if not zero_is_value or zero_is_value.upper() != "YES":
-        # Replace the 0 values to NaN, where zero shows evidence of absence.
-        ds[short_name] = ds[short_name].where(ds[short_name] != 0, np.nan)
-
-    ds = merge_with_grid_area(sd, ds, cell_size)
-    return ds
-
-
-def regridded_tif_2_ds(sd, raster_path, short_name, long_name, units, source, time, cell_size, zero_is_value=False):
-    ds = xr.open_dataset(raster_path)  # Open into an xarray.DataArray
-    ds = ds.astype(np.float64).isel(band=0).drop_vars(['band', 'spatial_ref']).rename({'x': 'lon', 'y': 'lat'})
-
-    # Round latitude and longitude values to one decimal place
-    decimal_places = 3  # Adjust as needed
-    ds['lon'] = ds['lon'].round(decimal_places)
-    ds['lat'] = ds['lat'].round(decimal_places)
-    ds['lat'].attrs, ds['lon'].attrs = get_lat_lon_attrs()
-
-    # change the variable name from default band_data to specified name
-    ds = ds.rename({'band_data': short_name})
-
-    # Add time dimension if provided
-    if time is not None:
-        time_d = pd.to_datetime(time)
-        ds = ds.assign_coords(time=time_d)
-        ds = ds.expand_dims(dim='time')
-
-    # Add variable metadata
-    attrs = {'short_name': short_name, 'long_name': long_name, 'units': units}
-    if source is not None:
-        attrs['source'] = source
-
-    ds[short_name].attrs = attrs
-
-    if not zero_is_value or zero_is_value.upper() != "YES":
-        # Replace the 0 values to NaN, where zero shows evidence of absence.
-        ds[short_name] = ds[short_name].where(ds[short_name] != 0, np.nan)
-    
-    ds = merge_with_grid_area(sd, ds, cell_size)
-    return ds
-
-
-def merge_ds_list(sd, dataset_list, netcdf_path=None, filename=None):
-    ds = xr.merge(dataset_list)
-    ds.attrs = {}  # Delete autogenerated global attributes
-    ds.attrs.update(sd.global_attr)  # Adding new global attributes
-
-    if netcdf_path is not None:
-        ds.to_netcdf(netcdf_path + filename + ".nc")
-    return ds
-
-
-def move_points(sd, input_shapefile, world_shp, output_shapefile, x_offset=0.0001, y_offset=0.0001):
-    point_selected, output_layer_names, num_records = sd.arcpy.management.SelectLayerByLocation(input_shapefile,
-                                                                                                "BOUNDARY_TOUCHES",
-                                                                                                world_shp, "",
-                                                                                                "NEW_SELECTION",
-                                                                                                "NOT_INVERT")
-    # Create a copy of the input shapefile to store the modified points
-    sd.arcpy.CopyFeatures_management(point_selected, output_shapefile)
-
-    # Update the copied shapefile by moving points by the specified offsets
-    with sd.arcpy.da.UpdateCursor(output_shapefile, ["SHAPE@XY"]) as cursor:
-        for row in cursor:
-            x, y = row[0]
-            new_x = x + x_offset
-            new_y = y + y_offset
-            row[0] = (new_x, new_y)
-            cursor.updateRow(row)
-
-    return output_shapefile, point_selected
-
-
-def point_2_tif(sd, input_shapefile, temp_path, gdb_path, cell_size, filename, field_name=None, field_summary=None):
-    # Create a world shapefile for summarization
-    cell_size_name = process_data.replace_special_characters(str(cell_size))
-    world_shp = temp_path + "World_" + cell_size_name + "deg.shp"
-
-    # Set a default summary statistic if not provided
-    if field_summary is None:
-        field_summary = 'SUM'
-
-    # Define output file name based on provided or default values
-    if field_name is not None:
-        if filename is not None:
-            outname = "Point_" + filename + field_name + "_" + field_summary
-            output_file = temp_path + outname + ".tif"
-        else:
-            outname = "Point_" + field_name + "_" + field_summary
-            output_file = temp_path + outname + ".tif"
-
-        # Summarize points within polygons and create a raster
-        summarize = sd.arcpy.analysis.SummarizeWithin(world_shp, input_shapefile, gdb_path + outname, "KEEP_ALL",
-                                                        [[field_name, field_summary]], "ADD_SHAPE_SUM",
-                                                        "SQUAREKILOMETERS", "", "NO_MIN_MAJ", "NO_PERCENT", "")
-
-        value_field = field_summary + "_" + field_name
-        sd.arcpy.conversion.PolygonToRaster(summarize, value_field, output_file, "CELL_CENTER", "NONE",
-                                              cell_size, "DO_NOT_BUILD")
-    else:
-        # Define output file name for point counts
-        if filename is not None:
-            outname = filename + "Point_Counts"
-        else:
-            outname = "Point_Counts"
-
-        output_file = temp_path + outname + ".tif"
-
-        # Summarize points within polygons and create a raster for point counts
-        summarize = sd.arcpy.analysis.SummarizeWithin(world_shp, input_shapefile, gdb_path + outname, "KEEP_ALL",
-                                                        [], "ADD_SHAPE_SUM", "SQUAREKILOMETERS", "", "NO_MIN_MAJ",
-                                                        "NO_PERCENT", "")
-
-        sd.arcpy.conversion.PolygonToRaster(summarize, "Point_Count", output_file, "CELL_CENTER", "NONE",
-                                              cell_size, "DO_NOT_BUILD")
-
-    return output_file
-
-
-def line_2_tif(sd, input_shapefile, temp_path, gdb_path, cell_size, filename, field_name=None, field_summary=None):
-    world_shp = create.create_gridded_polygon(sd, temp_path, cell_size)
-    cell_size_name = process_data.replace_special_characters(str(cell_size))
-    world_shp = temp_path + "World_" + cell_size_name + "deg.shp"
-
-    if field_summary is None:
-        field_summary = 'SUM'
-
-    if field_name is not None:
-        # Generate output name based on field_name and filename
-        if filename is not None:
-            outname = "Line_" + filename + field_name + "_" + field_summary
-            output_file = temp_path + outname + ".tif"
-        else:
-            outname = "Line_" + field_name + "_" + field_summary
-            output_file = temp_path + outname + ".tif"
-
-        # Use SummarizeWithin to calculate statistics within polygons
-        summarize = sd.arcpy.analysis.SummarizeWithin(world_shp, input_shapefile, gdb_path + outname, "KEEP_ALL",
-                                                        [[field_name, field_summary]], "ADD_SHAPE_SUM",
-                                                        "KILOMETERS", "", "NO_MIN_MAJ", "NO_PERCENT", "")
-
-        # Define the value field based on field_name and field_summary
-        value_field = field_summary + "_" + field_name
-
-        # Convert summarized data to raster
-        sd.arcpy.conversion.PolygonToRaster(summarize, value_field, output_file, "CELL_CENTER", "NONE",
-                                            cell_size, "DO_NOT_BUILD")
-    else:
-        # Generate output name based on filename
-        if filename is not None:
-            outname = filename + "Line_length"
-            output_file = temp_path + outname + ".tif"
-        else:
-            outname = "Line_length"
-            output_file = temp_path + outname + ".tif"
-
-        # Use SummarizeWithin to calculate line lengths within polygons
-        summarize = sd.arcpy.analysis.SummarizeWithin(world_shp, input_shapefile, gdb_path + outname, "KEEP_ALL",
-                                                      [], "ADD_SHAPE_SUM", "KILOMETERS", "", "NO_MIN_MAJ",
-                                                      "NO_PERCENT", "")
-
-        # Convert summarized line lengths to raster
-        sd.arcpy.conversion.PolygonToRaster(summarize, "sum_Length_KILOMETERS", output_file, "CELL_CENTER",
-                                            "NONE", cell_size, "DO_NOT_BUILD")
-
-    return output_file
-
-
-def poly_2_tif(sd, input_shapefile, temp_path, gdb_path, cell_size, filename, fraction=None):
-    cell_size_name = process_data.replace_special_characters(str(cell_size))
-    world_shp = temp_path + "World_" + cell_size_name + "deg.shp"
-
-    # Determine the output file name
-    if filename is not None:
-        outname = "Summarize_" + filename
-        output_file = temp_path + outname + ".tif"
-    else:
-        outname = "Summarize_Polygon"
-        output_file = temp_path + outname + ".tif"
-
-    # Summarize area within grid cells
-    summarize = sd.arcpy.analysis.SummarizeWithin(world_shp, input_shapefile, gdb_path + outname, "KEEP_ALL", [],
-                                                    "ADD_SHAPE_SUM", "SQUAREKILOMETERS", "", "NO_MIN_MAJ",
-                                                    "NO_PERCENT", "")
-
-    # Check if fraction data needs to be calculated
-    if fraction and fraction.upper() == "YES":
-        # Calculate fraction field and create raster
-        fraction = sd.arcpy.management.CalculateField(summarize, "frac", "!sum_Area_SQUAREKILOMETERS! / !g_area!",
-                                                        "PYTHON3", "", "TEXT", "NO_ENFORCE_DOMAINS")[0]
-
-        raster = sd.arcpy.conversion.PolygonToRaster(fraction, "frac", output_file, "CELL_CENTER", "NONE",
-                                                       cell_size, "DO_NOT_BUILD")
-
-        # Calculate and print the global sum of area
-        value = calculate.calculate_statistics(sd, fraction, "sum_Area_SQUAREKILOMETERS")
-        print(f"Global sum of area after gridding : {value:.2f} km2.")
-        print("Fraction is created.")
-    else:
-        # Create raster without fraction data
-        raster = sd.arcpy.conversion.PolygonToRaster(summarize, "sum_Area_SQUAREKILOMETERS", output_file,
-                                                       "CELL_CENTER", "NONE", cell_size,
-                                                       "DO_NOT_BUILD")
-
-    return output_file
-
-
-def check_cell_size(sd, raster):
-    # Get the X and Y cell sizes from the raster properties, and round and convert cell sizes to float
-    x_size = round(float(sd.arcpy.management.GetRasterProperties(raster, 'CELLSIZEX').getOutput(0)), 3)
-    y_size = round(float(sd.arcpy.management.GetRasterProperties(raster, 'CELLSIZEY').getOutput(0)), 3)
-
-    if x_size != y_size:
-        raise ValueError("X and Y cell size are not equal!")
-
-    print(f"X and Y-cell size of raw data: {x_size} degree")
-
-
-def get_lat_lon_attrs():
-    # add lat and lon attributes
-    lat_attr = {"units": "degrees_north",
-                "point_spacing": "even",
-                "axis": "Y"}
-
-    lon_attr = {"units": "degrees_east",
-                "modulo": 360.,
-                "point_spacing": "even",
-                "axis": "X"}
-    return lat_attr, lon_attr
-
-
-def merge_with_grid_area(sd, ds, cell_size):
-    
-    # Get the directory of the current script
-    config_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '')
-
-    # Merging the generated dataset with grid area
-    cell_size_str = str(cell_size)
-    if cell_size_str == "1" or cell_size_str == "1.0":
-        ds = xr.merge([ds, xr.load_dataset(sd.config['file_paths']['grid_area_1deg'])])
-    elif cell_size_str == "0.5":
-        ds = xr.merge([ds, xr.load_dataset(sd.config['file_paths']['grid_area_0_5deg'])])
-    elif cell_size_str == "0.25":
-        ds = xr.merge([ds, xr.load_dataset(sd.config['file_paths']['grid_area_0_25deg'])])
-
-    # Set and add global attributes
-    ds.attrs = sd.global_attr
-    return ds
-
-
-def print_global_gridded_val(fold_function, ds_var):
-    if fold_function.upper() == "SUM":
-        print(f"Global gridded {fold_function}: {ds_var.sum().item()}")
-    elif fold_function.upper() == "MEAN":
-        print(f"Global gridded {fold_function}: {ds_var.mean().item()}")
-    elif fold_function.upper() == "MAX":
-        print(f"Global gridded {fold_function}: {ds_var.max().item()}")
-    elif fold_function.upper() == "STD":
-        print(f"Global gridded {fold_function}: {ds_var.std().item()}")
-    else:
-        sys.exit(1)
-    return None
-
-
-def adjust_time_var(time, ds, cntry_ds, var):
-    if 'time' in ds[var].dims:
-        if time is not None:
-            cntry_ds = cntry_ds.sel(time=time, method='nearest')
-            ds_var = ds[var].sel(time=time, method='nearest')
-        else:
-            latest_time = ds[var]['time'][-1].values
-            cntry_ds = cntry_ds.sel(time=latest_time, method='nearest')
-            ds_var = ds[var].sel(time=latest_time, method='nearest')
-    else:
-        cntry_ds = cntry_ds.sel(time='2020-01-01')
-        ds_var = ds[var]
-
-    return cntry_ds, ds_var
-
-
-def add_year_col(time, dataframes):
-    if time is not None:
-        year = time[:4]
-        merged_df = dataframes[0]  # Start with the first DataFrame
-        merged_df = pd.concat([merged_df['ISO3'], pd.DataFrame({'Year': year}, index=merged_df.index),
-                               merged_df.drop(columns=['ISO3'])], axis=1)
-    else:
-        merged_df = dataframes[0]  # Start with the first DataFrame
-    return merged_df
-
-
-def save_to_nc(output_directory, output_filename, time, ds, base_filename):
-    if output_directory != None:
-        if time != None:
-            if output_filename != None:
-                ds.to_netcdf(output_directory + output_filename + "_" + str(time) + ".nc")
-            else:
-                ds.to_netcdf(output_directory + base_filename + "_" + str(time) + ".nc")
-        else:
-            if output_filename != None:
-                ds.to_netcdf(output_directory + output_filename + ".nc")
-            else:
-                ds.to_netcdf(output_directory + base_filename + ".nc")
-                
-                
-def delete_temporary_folder(folder_path):
-    import shutil
-    import os
-    try:
-        # Remove read-only attribute, if exists
-        os.chmod(folder_path, 0o777)
-        
-        # Delete the folder and its contents
-        shutil.rmtree(folder_path)
-        print(f"Successfully deleted the folder: {folder_path}")
-    except Exception as e:
-        print(f"Error deleting the folder: {e}")

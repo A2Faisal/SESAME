@@ -1,45 +1,252 @@
 import os
-import numpy as np
-import utils
-import xarray as xr
+import re
+import geopandas as gpd
 import pandas as pd
-import sys
+from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
+import pyproj
+import numpy as np
+import xarray as xr
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
 
 
+def calculate_geometry_attributes(input_gdf):
+    gdf = input_gdf.copy()
 
-def calculate_length(sd, shape_file_path):
-    output_file = shape_file_path
+    # Ensure the coordinate system is WGS84
+    gdf.set_crs(epsg=4326, inplace=True)
+    gdf = gdf.to_crs(epsg=4326)
 
-    # Calculate length for each line in the shapefile
-    length = sd.arcpy.management.CalculateGeometryAttributes(output_file, [["Length", "LENGTH_GEODESIC"]],
-                                                               "KILOMETERS", "",
-                                                               coordinate_format="SAME_AS_INPUT")[0]
+    # Initialize the WGS84 ellipsoid
+    geod = pyproj.Geod(ellps="WGS84")
 
-    line_length = calculate_statistics(sd, shape_file_path, "Length")
-    return line_length
+    # Calculate area and length for each feature
+    areas = []
+    lengths = []
 
-
-def calculate_raw_global_value(conversion_type, arr, zero_is_value):
-    # Calculate raw global value based on the conversion type
-    if conversion_type.upper() == 'SUM':
-        raw_global_value = arr.sum()
-    elif conversion_type.upper() == 'MEAN':
-        # Handling zero values based on the 'zero_is_value' parameter
-        if zero_is_value and zero_is_value.upper() == "YES":
-            raw_global_value = arr.mean()
+    for geom in gdf.geometry:
+        if geom.is_valid:  # Check if the geometry is valid
+            if isinstance(geom, Polygon):
+                # Calculate the geodesic area for polygons
+                area = abs(geod.geometry_area_perimeter(geom)[0])
+                areas.append(np.float64(area))  # Convert to double precision
+                lengths.append(None)  # No length for polygons
+            elif isinstance(geom, (LineString, MultiLineString)):  # Handle MultiLineString geometries
+                # Calculate the geodesic length for lines
+                length = geod.geometry_length(geom)
+                lengths.append(np.float64(length))  # Convert to double precision
+                areas.append(None)  # No area for lines
+            else:
+                areas.append(None)
+                lengths.append(None)
         else:
-            mean_arr = arr.astype(np.float64)
-            mean_arr[mean_arr == 0] = np.nan
-            # Calculate the mean
-            raw_global_value = np.nanmean(mean_arr)
-    elif conversion_type.upper() == 'MAX':
-        raw_global_value = arr.max()
-    else:
-        raise ValueError("Conversion should be either SUM, MEAN, or MAX.")
-    return raw_global_value
+            areas.append(None)
+            lengths.append(None)
+
+    # Add the new attributes to the GeoDataFrame
+    gdf['area_m2'] = areas
+    gdf['length_m'] = lengths
+
+    # Remove columns with all None values
+    if gdf['area_m2'].isnull().all():
+        gdf.drop(columns=['area_m2'], inplace=True)
+    if gdf['length_m'].isnull().all():
+        gdf.drop(columns=['length_m'], inplace=True)
+
+    return gdf
+
+def calculate_geometry_attributes(input_gdf):
+    gdf = input_gdf.copy()
+
+    # Ensure the coordinate system is WGS84
+    if gdf.crs != "EPSG:4326":
+        gdf = gdf.to_crs(epsg=4326)
+
+    # Initialize the WGS84 ellipsoid
+    geod = pyproj.Geod(ellps="WGS84")
+
+    # Calculate area and length for each feature
+    areas = []
+    lengths = []
+
+    for idx, geom in enumerate(gdf.geometry):
+        if geom.is_valid:  # Check if the geometry is valid
+            if isinstance(geom, (Polygon, MultiPolygon)):
+                # Calculate the geodesic area for polygons
+                area = abs(geod.geometry_area_perimeter(geom)[0])
+                areas.append(np.float64(area))  # Convert to double precision
+                lengths.append(None)  # No length for polygons
+            elif isinstance(geom, (LineString, MultiLineString)):
+                # Calculate the geodesic length for lines
+                length = geod.geometry_length(geom)
+                lengths.append(np.float64(length))  # Convert to double precision
+                areas.append(None)  # No area for lines
+            else:
+                areas.append(None)
+                lengths.append(None)
+        else:
+            try:
+                # Attempt to fix invalid geometry with buffer(0)
+                fixed_geom = geom.buffer(0)
+                if fixed_geom.is_valid:
+                    if isinstance(fixed_geom, (Polygon, MultiPolygon)):
+                        # Calculate the geodesic area for polygons
+                        area = abs(geod.geometry_area_perimeter(fixed_geom)[0])
+                        areas.append(np.float64(area))  # Convert to double precision
+                        lengths.append(None)  # No length for polygons
+                    elif isinstance(fixed_geom, (LineString, MultiLineString)):
+                        # Calculate the geodesic length for lines
+                        length = geod.geometry_length(fixed_geom)
+                        lengths.append(np.float64(length))  # Convert to double precision
+                        areas.append(None)  # No area for lines
+                    else:
+                        areas.append(None)
+                        lengths.append(None)
+                else:
+                    raise ValueError("Geometry could not be fixed")
+            except Exception as e:
+                # Print the row if geometry is not valid and could not be fixed
+                print(f"Invalid geometry at index {idx} and could not be fixed: {geom}")
+                print(gdf.iloc[idx])
+                print(f"Error: {e}")
+                areas.append(None)
+                lengths.append(None)
+
+    # Add the new attributes to the GeoDataFrame
+    gdf['area_m2'] = areas
+    gdf['length_m'] = lengths
+
+    # Remove columns with all None values
+    if gdf['area_m2'].isnull().all():
+        gdf.drop(columns=['area_m2'], inplace=True)
+    if gdf['length_m'].isnull().all():
+        gdf.drop(columns=['length_m'], inplace=True)
+
+    return gdf
+
+
+import geopandas as gpd
+from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
+import pyproj
+import numpy as np
+
+def calculate_geometry_attributes(input_gdf, column_name=None):
+    """
+    Calculate area or length for each geometry in the GeoDataFrame and store it in a specified column.
+
+    Parameters
+    ----------
+    input_gdf : gpd.GeoDataFrame
+        Input GeoDataFrame containing geometries.
+    column_name : str, optional
+        Column name to store the calculated values (either area or length). 
+        If None, 'area_m2' or 'length_m' will be used based on the geometry type.
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        The updated GeoDataFrame with the specified column.
+    """
+    # Copy the GeoDataFrame to avoid modifying the original
+    gdf = input_gdf.copy()
+
+    # Ensure the coordinate system is WGS84
+    if gdf.crs != "EPSG:4326":
+        gdf = gdf.to_crs(epsg=4326)
+
+    # Initialize the WGS84 ellipsoid
+    geod = pyproj.Geod(ellps="WGS84")
+
+    # Initialize list to store the calculated values
+    values = []
+
+    # Determine the appropriate column name if not provided
+    if column_name is None:
+        # Default to 'area_m2' or 'length_m' based on geometry type
+        # Check if there are any polygons or lines to determine column name
+        if any(isinstance(geom, (Polygon, MultiPolygon)) for geom in gdf.geometry):
+            column_name = 'area_m2'
+        elif any(isinstance(geom, (LineString, MultiLineString)) for geom in gdf.geometry):
+            column_name = 'length_m'
+        else:
+            column_name = 'geometry_value'  # Default to a generic name if no polygons or lines are found
+
+    # Calculate area or length for each geometry
+    for geom in gdf.geometry:
+        if geom.is_valid:
+            if isinstance(geom, (Polygon, MultiPolygon)):
+                # Calculate the geodesic area for polygons
+                area = abs(geod.geometry_area_perimeter(geom)[0])
+                values.append(np.float64(area))
+            elif isinstance(geom, (LineString, MultiLineString)):
+                # Calculate the geodesic length for lines
+                length = geod.geometry_length(geom)
+                values.append(np.float64(length))
+            else:
+                values.append(None)
+        else:
+            try:
+                # Attempt to fix invalid geometry with buffer(0)
+                fixed_geom = geom.buffer(0)
+                if fixed_geom.is_valid:
+                    if isinstance(fixed_geom, (Polygon, MultiPolygon)):
+                        area = abs(geod.geometry_area_perimeter(fixed_geom)[0])
+                        values.append(np.float64(area))
+                    elif isinstance(fixed_geom, (LineString, MultiLineString)):
+                        length = geod.geometry_length(fixed_geom)
+                        values.append(np.float64(length))
+                    else:
+                        values.append(None)
+                else:
+                    raise ValueError("Fixed geometry is still invalid")
+            except Exception as e:
+                # Log the error and append None values
+                print(f"Invalid geometry could not be fixed: {geom}")
+                print(f"Error: {e}")
+                values.append(None)
+
+    # Add the calculated attributes to the GeoDataFrame
+    gdf[column_name] = values
+
+    # Drop the column if it contains only None values
+    if gdf[column_name].isnull().all():
+        gdf.drop(columns=[column_name], inplace=True)
+
+    return gdf
+
+
+
+def calculate_geodetic_pixel_area(lon, lat, pixel_width_deg, pixel_height_deg):
+    geod = pyproj.Geod(ellps="WGS84")
+    lons = [lon - pixel_width_deg / 2, lon + pixel_width_deg / 2, lon + pixel_width_deg / 2, lon - pixel_width_deg / 2, lon - pixel_width_deg / 2]
+    lats = [lat - pixel_height_deg / 2, lat - pixel_height_deg / 2, lat + pixel_height_deg / 2, lat + pixel_height_deg / 2, lat - pixel_height_deg / 2]
+    area, _ = geod.polygon_area_perimeter(lons, lats)[:2]
+    return abs(area) #/ 1e6  Convert from square meters to square kilometers
+
 
 
 def calculate_grid_resolution(resolution):
+    """
+    Calculate the number of latitude and longitude grid cells based on the given resolution.
+
+    Parameters
+    ----------
+    resolution : int, float, or str
+        The resolution can be provided as a numeric value (int or float), or as a string
+        in the format '<value> degree(s)', where <value> is a numeric value.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the calculated number of latitude and longitude grid cells.
+
+    Raises
+    ------
+    ValueError
+        If the resolution is not in a valid format or cannot be converted to a numeric value.
+    """
+
     try:
         # Convert the resolution to a numeric value (degrees)
         if isinstance(resolution, (int, float)):
@@ -55,146 +262,7 @@ def calculate_grid_resolution(resolution):
     except (ValueError, AttributeError):
         # Raise an error if the resolution is not in a valid format
         raise ValueError("Resolution should be in the format '<value> degree(s)' or a numeric value")
-
-
-def calculate_statistics(sd, shapefile, column_to_analyze):
-    # Calculate the total sum
-    total_sum = 0
-
-    # Use arcpy's SearchCursor to iterate through rows in the shapefile
-    with sd.arcpy.da.SearchCursor(shapefile, [column_to_analyze]) as cursor:
-        for row in cursor:
-            # Add the value of the specified column to the total sum
-            total_sum += row[0]
-    return total_sum
-
-
-def calculate_statistics_from_dataset(ds, variable_name):
-    # Calculate the sum
-    total_sum = ds[variable_name].sum().values
-    return total_sum
-
-
-def calculate_padded_array(num_lat, num_lon, arr):
-    num_rows, num_cols = arr.shape
-
-    # Check if the dimensions are perfectly divisible
-    if num_rows % num_lat == 0 and num_cols % num_lon == 0:
-        padded_arr = arr
-    else:
-        # Calculate padding needed for the array
-        lat_padding = num_lat - (arr.shape[0] % num_lat)
-        lon_padding = num_lon - (arr.shape[1] % num_lon)
-
-        # Distribute the padding evenly to the start and end of the array
-        lat_padding_start = lat_padding // 2
-        lat_padding_end = lat_padding - lat_padding_start
-        lon_padding_start = lon_padding // 2
-        lon_padding_end = lon_padding - lon_padding_start
-
-        # Pad the array with zeros
-        padded_arr = np.pad(arr, ((lat_padding_start, lat_padding_end), (lon_padding_start, lon_padding_end)),
-                            mode='constant', constant_values=0)
-    return padded_arr
-
-
-def calculate_aligned_array(num_lat, num_lon, padded_arr):
-    # Calculate factors for latitude and longitude
-    lat_factor = padded_arr.shape[0] // num_lat
-    lon_factor = padded_arr.shape[1] // num_lon
-
-    # Check if the dimensions are divisible
-    if padded_arr.shape[0] % lat_factor != 0 or padded_arr.shape[1] % lon_factor != 0:
-        print("Warning: padded array's dimensions are not perfectly divisible!")
-
-    aligned_arr = np.zeros((num_lat, num_lon, lat_factor, lon_factor))
-
-    for i in range(num_lat):
-        for j in range(num_lon):
-            lat_start = i * lat_factor
-            lat_end = (i + 1) * lat_factor
-            lon_start = j * lon_factor
-            lon_end = (j + 1) * lon_factor
-
-            aligned_arr[i, j] = padded_arr[lat_start:lat_end, lon_start:lon_end]
-
-    return aligned_arr
-
-
-def calculate_regridded_global_value(conversion_type, num_lat, num_lon, aligned_arr, cell_size, zero_is_value):
-    lat_resolution = cell_size
-    lon_resolution = cell_size
-    lat = np.linspace(90 - lat_resolution / 2, -90 + lat_resolution / 2, num=num_lat)
-    lon = np.linspace(-180 + lon_resolution / 2, 180 - lon_resolution / 2, num=num_lon)
-
-    # Create an xarray DataArray with dimensions and coordinates
-    da = xr.DataArray(aligned_arr, dims=("lat", "lon", "lat_factor", "lon_factor"),
-                      coords={"lat": lat, "lon": lon})
-    # Perform the aggregation over the lat_factor and lon_factor dimensions
-    if conversion_type.upper() == 'SUM':
-        da_agg = da.sum(dim=['lat_factor', 'lon_factor'])
-        regridded_global_value = da_agg.sum().item()
-    elif conversion_type.upper() == 'MEAN':
-        if zero_is_value and zero_is_value.upper() == "YES":
-            da_agg = da.mean(dim=['lat_factor', 'lon_factor'])
-            regridded_global_value = da_agg.mean().item()
-        else:
-            # Calculate the sum and count of non-zero values
-            da_sum = da.sum(dim=['lat_factor', 'lon_factor'])
-            da_count = da.where(da != 0).count(dim=['lat_factor', 'lon_factor'])
-            # Calculate the mean, handling division by zero
-            da_agg_nan = da_sum / da_count.where(da_count != 0, np.nan)
-            # Replace nan values with 0
-            da_agg = da_agg_nan.fillna(0)
-            regridded_global_value = da_agg_nan.mean().item()
-    elif conversion_type.upper() == 'MAX':
-        da_agg = da.max(dim=['lat_factor', 'lon_factor'])
-        regridded_global_value = da_agg.max().item()
-    else:
-        raise ValueError("Conversion should be either SUM, MEAN, or MAX")
-    return regridded_global_value, da_agg
-
-
-def calculate_ds(sd, value_per_sqm, da, short_name, long_name, units, source, cell_size, time, zero_is_value):
-    # Get the directory of the current script
-    config_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '')
-    
-    if value_per_sqm and value_per_sqm.upper() == "YES":
-        cell_size_str = str(cell_size)
-        if cell_size_str == "1" or cell_size_str == "1.0":
-            grid_ds = xr.load_dataset(sd.config['file_paths']['grid_area_1deg'])
-            da = da / grid_ds["grid_area_1deg"]
-        elif cell_size_str == "0.5":
-            grid_ds = xr.load_dataset(sd.config['file_paths']['grid_area_0_5deg'])
-            da = da / grid_ds["grid_area_0_5deg"]
-        elif cell_size_str == "0.25":
-            grid_ds = xr.load_dataset(sd.config['file_paths']['grid_area_0_25deg'])
-            da = da / grid_ds["grid_area_0_25deg"]
-
-        if units is None:
-            units = 'value/grid-cell'
-
-        ds = utils.da_to_ds(sd, da, short_name, long_name, units, source, time, cell_size, zero_is_value)
-    else:
-        ds = utils.da_to_ds(sd, da, short_name, long_name, units, source, time, cell_size, zero_is_value)
-    return ds
-
-
-def calculate_fold_function(fold_function, ds_var):
-    data = None
-
-    if fold_function.upper() == "SUM":
-        data = ds_var.sum()
-    elif fold_function.upper() == "MEAN":
-        data = ds_var.mean()
-    elif fold_function.upper() == "MAX":
-        data = ds_var.max()
-    elif fold_function.upper() == "STD":
-        data = ds_var.std()
-    else:
-        sys.exit(1)
-    return data
-
+        
 
 def sum_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
     if dataset is None and netcdf_directory is None:

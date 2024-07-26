@@ -1,13 +1,159 @@
 import os
+import re
+import geopandas as gpd
+from shapely.geometry import Polygon, LineString, Point
+import pyproj
+import numpy as np
 import xarray as xr
-import process_data
-import get
-import utils
+import warnings
 import calculate
-import pandas as pd
+import utils
+
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
+
+def calculate_geometry_attributes(input_gdf):
+    gdf = input_gdf.copy()
+
+    # Ensure the coordinate system is WGS84
+    gdf.set_crs(epsg=4326, inplace=True)
+    gdf = gdf.to_crs(epsg=4326)
+
+    # Initialize the WGS84 ellipsoid
+    geod = pyproj.Geod(ellps="WGS84")
+
+    # Calculate area and length for each feature
+    areas = []
+    lengths = []
+
+    for geom in gdf.geometry:
+        if isinstance(geom, Polygon):
+            # Calculate the geodesic area for polygons
+            area = abs(geod.geometry_area_perimeter(geom)[0]) #  / 1e6  Convert from square meters to square kilometers
+            areas.append(area)
+            lengths.append(None)  # No length for polygons
+        elif isinstance(geom, LineString):
+            # Calculate the geodesic length for lines
+            length = geod.geometry_length(geom)  #  / 1e3 Convert from meters to kilometers
+            lengths.append(length)
+            areas.append(None)  # No area for lines
+
+    # Add the new attributes to the GeoDataFrame
+    gdf['g_area'] = areas
+    gdf['g_length'] = lengths
+
+    # Remove columns with all None values
+    if gdf['g_area'].isnull().all():
+        gdf.drop(columns=['g_area'], inplace=True)
+    if gdf['g_length'].isnull().all():
+        gdf.drop(columns=['g_length'], inplace=True)
+
+    return gdf
+
+def create_gridded_polygon(cell_size, out_polygon_path=None, grid_area=False):
+    """
+    Create a gridded polygon shapefile with the specified cell size.
+
+    Parameters:
+    -----------
+    cell_size : float
+        Size of each grid cell in degrees.
+
+    polygon_path : str, optional
+        Path to save the created polygon shapefile. If None, a temporary path is used.
+
+    grid_area : bool, optional
+        If True, calculate and add a 'g_area' field to store the geodesic area of each grid cell.
+
+    Returns:
+    --------
+    world_shp : str
+        Path to the generated gridded polygon shapefile.
+    """
+    # Define the extent of the world
+    xmin, ymin, xmax, ymax = -180, -90, 180, 90
+    
+    # Create grid cells
+    cols = np.arange(xmin, xmax, cell_size)
+    rows = np.arange(ymin, ymax, cell_size)
+    polygons = []
+    for x in cols:
+        for y in rows:
+            polygons.append(Polygon([(x, y), (x + cell_size, y), (x + cell_size, y + cell_size), (x, y + cell_size)]))
+    
+    # Create a GeoDataFrame
+    grid = gpd.GeoDataFrame({'geometry': polygons})
+    
+    # Set CRS to WGS84
+    grid.set_crs(epsg=4326, inplace=True)
+    
+    # Add 'id' field
+    grid['id'] = range(1, len(grid) + 1)
+    
+    # Calculate and add 'g_area' field if needed
+    if grid_area:
+        grid = calculate.calculate_geometry_attributes(input_gdf=grid)
+    
+    # Save to shapefile
+    if out_polygon_path:
+        cell_size_str = utils.replace_special_characters(str(cell_size))
+        filename = "World_" + cell_size_str + "deg.shp"
+        grid.to_file(out_polygon_path + filename)    
+    return grid
 
 
-def create_new_ds(sd, input_ds, tabular_column, country_ds, netcdf_variable, input_df, verbose):
+def create_global_xarray_dataset(pixel_width_deg, pixel_height_deg):
+    # Generate latitude and longitude values
+    latitudes = np.arange(pixel_height_deg / 2 - 90, 90, pixel_height_deg)[::-1]
+    longitudes = np.arange(pixel_width_deg / 2 - 180, 180, pixel_width_deg)
+
+    # Calculate pixel areas using vectorized operations
+    lon, lat = np.meshgrid(longitudes, latitudes)
+    pixel_areas = np.vectorize(calculate.calculate_geodetic_pixel_area)(
+        lon, lat, pixel_width_deg, pixel_height_deg
+    )
+
+    ds = xr.Dataset(
+        {"grid_area": (['lat', 'lon'], pixel_areas.astype(np.float64))},
+        coords={'lat': latitudes, 'lon': longitudes}
+    )
+
+    # add attributes
+    attrs = {'long_name': "Area of Grids", 'units': "m2"}
+    ds["grid_area"].attrs = attrs
+
+    decimal_places = 3  # Adjust as needed
+    ds['lon'] = ds['lon'].round(decimal_places)
+    ds['lat'] = ds['lat'].round(decimal_places)
+    
+    return ds
+
+def create_temp_folder(input_path, folder_name="temp"):
+    """
+    Create a temporary folder in the parent directory of the input path.
+
+    Parameters
+    ----------
+    input_path : str
+        The input path to determine the parent directory.
+    folder_name : str, optional
+        The name of the temporary folder to be created. Default is "temp".
+
+    Returns
+    -------
+    str
+        The path to the created or existing temporary folder.
+    """    
+    parent_dir = os.path.dirname(os.path.dirname(input_path))
+    path = os.path.join(parent_dir, folder_name)
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+    path = os.path.join(path, '')
+    return path
+
+
+def create_new_ds(input_ds, tabular_column, country_ds, netcdf_variable, input_df, verbose):
     country_netcdf = country_ds * input_ds[netcdf_variable]
     new_ds = xr.Dataset(coords=input_ds.coords)
 
@@ -30,88 +176,3 @@ def create_new_ds(sd, input_ds, tabular_column, country_ds, netcdf_variable, inp
                 new_ds[var_name] = (country_netcdf[var_name] * numeric_value) / total_country
     return new_ds
 
-
-def create_temp_folder(input_path, folder_name="temp"):
-    parent_dir = os.path.dirname(os.path.dirname(input_path))
-    path = os.path.join(parent_dir, folder_name)
-
-    if not os.path.exists(path):
-        os.makedirs(path)
-    path = os.path.join(path, '')
-    return path
-
-
-def create_gridded_polygon(sd, raster_path, cell_size, polygon_path=None, grid_area=None, verbose=False):
-    if polygon_path is None:
-        # creating temporary folder
-        temp_path = create_temp_folder(input_path=raster_path, folder_name="temp")
-        polygon_path = temp_path
-
-    # Create world gridded layer
-    cell_size_name = process_data.replace_special_characters(str(cell_size))
-    filename = "World_" + cell_size_name + "deg.shp"
-    world_shp = sd.arcpy.management.CreateFishnet(polygon_path + filename, "-180 -90", "-180 -80",
-                                                  cell_size, cell_size, None, None,
-                                                  "180 90", "NO_LABELS",
-                                                  "-180 -90 180 90 GEOGCS[\"GCS_WGS_1984\",DATUM[\"D_WGS_1984\",SPHEROID[\"WGS_1984\",6378137.0,298.257223563]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]]",
-                                                  "POLYGON")[0]
-
-    # Adding attributes for ID, grid area, and fraction
-    world_shp = \
-        sd.arcpy.management.AddField(world_shp, "id", "LONG", None, None, None, "", "NULLABLE", "NON_REQUIRED", "")[0]
-
-    world_shp = sd.arcpy.management.AddField(world_shp, "g_area", "DOUBLE", None, None, None, "", "NULLABLE",
-                                             "NON_REQUIRED", "")[0]
-
-    world_shp = sd.arcpy.management.AddField(world_shp, "frac", "DOUBLE", None, None, None, "", "NULLABLE",
-                                             "NON_REQUIRED", "")[0]
-
-    # Generate ID numbers based on FID
-    world_shp = sd.arcpy.management.CalculateField(world_shp, "id", "!FID!+1", "PYTHON3", "", "TEXT",
-                                                   "NO_ENFORCE_DOMAINS")[0]
-
-    if grid_area is not None:
-        # Calculating the area of each grid
-        world_shp = polygon_path + filename
-        world_shp = sd.arcpy.management.CalculateGeometryAttributes(world_shp, [["g_area", "AREA_GEODESIC"]],
-                                                                    area_unit="SQUARE_KILOMETERS",
-                                                                    coordinate_system="GEOGCS[\"GCS_WGS_1984\",DATUM[\"D_WGS_1984\",SPHEROID[\"WGS_1984\",6378137.0,298.257223563]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]]")[
-            0]
-
-    if verbose:
-        print("Global gridded polygon is created.")
-
-    return world_shp
-
-
-def create_df(sd, dataframes, var, verbose, cell_size, grid_area, fold_function, time, ds):
-    # Select the country fraction data based on cell size
-    try:
-        cntry_ds, ds_grid = get.get_country_fraction_data(sd, cell_size)
-    except FileNotFoundError as e:
-        print(f" Error while reading file {e} ")
-
-    # Check if 'time' is a dimension in the variable
-    cntry_ds, ds_var = utils.adjust_time_var(time, ds, cntry_ds, var)
-
-    if grid_area is not None and grid_area.upper() == 'YES':
-        # Multiply the variable by grid area if specified
-        ds_var = ds_var * ds_grid
-        print(f"Generating the tabular data for: {var}")
-
-    if verbose:
-        utils.print_global_gridded_val(fold_function, ds_var)
-
-    ds_var = ds_var * cntry_ds
-
-    data = calculate.calculate_fold_function(fold_function, ds_var)
-
-    # Extract variable names and values
-    variable_names = list(data.data_vars.keys())
-    values = [data[var].values.item() for var in variable_names]
-
-    # Create a DataFrame from variable names and values
-    df = pd.DataFrame({'ISO3': variable_names, var: values})
-    dataframes.append(df)
-
-    return dataframes
