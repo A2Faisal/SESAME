@@ -12,6 +12,7 @@ import create
 import utils
 import calculate
 import plot
+import json
 
 def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_file_path=None, input_ds=None,
                  input_df=None, variable_name=None, long_name=None, units="value/grid-cell", source=None,
@@ -78,7 +79,10 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     # check the netcdf resolution
     cell_size = abs(float(input_ds['lat'].diff('lat').values[0]))
     cell_size_str = str(cell_size)
-    country_ds = xr.load_dataset("country_fraction.1deg.2000-2023.a.nc")
+
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json'), 'r') as file:
+        config = json.load(file)
+    country_ds = xr.load_dataset(config['file_paths']['Country_Fraction.1deg'])
 
     input_ds, country_ds, a = utils.adjust_datasets(input_ds, country_ds, time)
     print(f"Distributing {variable_name} onto {netcdf_variable}.")
