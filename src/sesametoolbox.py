@@ -30,8 +30,8 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     netcdf_file_path : str, optional
         a netcdf variable data path as string
     csv_file_path : str, optional
-        a tabular file where data is stored based on their juriconfigiction or ISO3 code. The csv file must hold a
-        column named “ISO3”. If not, then users must use juriconfigiction_2_ISO3 function to convert the country
+        a tabular file where data is stored based on their jurisdiction or ISO3 code. The csv file must hold a
+        column named “ISO3”. If not, then users must use jurisdiction_2_ISO3 function to convert the country
         name to their corresponding ISO3 code.
     input_ds : xarray.Dataset
         Input NetCDF dataset with spatial coordinates.
@@ -56,8 +56,8 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         if input “yes” then the value will be transformed into “value m-2”.
     verbose: bool, optional
         If “yes”, the global gridded sum of before and after re-gridding operation will be printed. If any
-        juriconfigiction where surrogate variable is missing and tabular data is evenly distributed over the
-        juriconfigiction, the ISO3 codes of evenly distributed countries will also be printed.
+        jurisdiction where surrogate variable is missing and tabular data is evenly distributed over the
+        jurisdiction, the ISO3 codes of evenly distributed countries will also be printed.
 
     Returns:
     --------
@@ -103,7 +103,7 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     da = xr.DataArray(a, coords={'lat': input_ds['lat'], 'lon': input_ds['lon']}, dims=['lat', 'lon'])
 
     if verbose:
-        print(f"Global sum of juriconfigictional dataset : {input_df[[tabular_column]].sum().item()}")
+        print(f"Global sum of jurisdictional dataset : {input_df[[tabular_column]].sum().item()}")
         print(f"Global sum of gridded dataset : {da.sum().item()}\n")
 
     if units == 'value/grid-cell':
