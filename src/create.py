@@ -6,7 +6,7 @@ import pyproj
 import numpy as np
 import xarray as xr
 import warnings
-import calculate
+import src.calculate as calculate
 import utils
 
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -88,11 +88,11 @@ def create_gridded_polygon(cell_size, out_polygon_path=None, grid_area=False):
     grid.set_crs(epsg=4326, inplace=True)
     
     # Add 'id' field
-    grid['id'] = range(1, len(grid) + 1)
+    grid['uid'] = range(1, len(grid) + 1)
     
     # Calculate and add 'g_area' field if needed
     if grid_area:
-        grid = calculate.calculate_geometry_attributes(input_gdf=grid)
+        grid = calculate.calculate_geometry_attributes(input_gdf=grid, column_name="grid_area")
     
     # Save to shapefile
     if out_polygon_path:

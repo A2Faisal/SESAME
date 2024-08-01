@@ -16,7 +16,7 @@ from shapely.geometry import box
 
 import warnings
 import create
-import calculate
+import src.calculate as calculate
 import get
 
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -93,40 +93,6 @@ def adjust_points(points_gdf, polygons_gdf, x_offset=0.0001, y_offset=0.0001):
     points_gdf['geometry'] = adjusted_points
     return points_gdf
 
-def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function='sum', x_offset=0.0001, y_offset=0.0001):
-    # Adjust points to ensure they are within or correctly intersecting polygons
-    points_gdf = adjust_points(points_gdf, polygons_gdf, x_offset, y_offset)
-    
-    # Perform spatial join with 'intersects' operation
-    points_within_polygons = gpd.sjoin(points_gdf, polygons_gdf, op='intersects')
-    
-    # If field_name is provided, convert the column to numeric
-    if fold_field:
-        points_within_polygons[fold_field] = pd.to_numeric(points_within_polygons[fold_field], errors='coerce')
-        variable_name = replace_special_characters(fold_field)
-        # Group by polygon and compute summary statistic based on operation
-        if fold_function.lower() == 'sum':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].sum().reset_index(name=variable_name)
-        elif fold_function.lower() == 'mean':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].mean().reset_index(name=variable_name)
-        elif fold_function.lower() == 'max':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].max().reset_index(name=variable_name)
-        elif fold_function.lower() == 'std':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].std().reset_index(name=variable_name)
-        else:
-            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
-    
-        # Merge summary statistics with polygons GeoDataFrame
-        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_index=True, right_on='index_right')
-    
-    else:
-        # Count the points within each polygon
-        polygon_counts = points_within_polygons.groupby('index_right').size().reset_index(name='count')
-        # Add the count to the polygons GeoDataFrame
-        polygons_gdf['count'] = polygons_gdf.index.to_series().map(polygon_counts.set_index('index_right')['count']).fillna(0).astype(int)
-    
-    return polygons_gdf
-
 
 def add_variable_attributes(ds, variable_name, long_name, units, source=None, time=None, cell_size=1, value_per_area=False, zero_is_value=False):
     """
@@ -180,12 +146,6 @@ def add_variable_attributes(ds, variable_name, long_name, units, source=None, ti
     else:
         # Replace the 0 values to NaN, where zero shows evidence of absence.
         ds[variable_name] = ds[variable_name].where(ds[variable_name] != 0, np.nan)
-
-    # add grid area variable
-    grid_ds = create.create_global_xarray_dataset(pixel_width_deg=cell_size, pixel_height_deg=cell_size)
-    ds = xr.merge([ds, grid_ds])
-    if value_per_area:
-        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
         
     # Add variable metadata
     attrs = {'long_name': long_name, 'units': units}
@@ -198,7 +158,8 @@ def add_variable_attributes(ds, variable_name, long_name, units, source=None, ti
     
     return ds
 
-def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, source=None, time=None, variable_name=None, cell_size=1, value_per_area=False, zero_is_value=False):
+def gridded_poly_2_dataset(polygon_gdf, grid_value, variable_name=None, cell_size=1):
+    
     # Extract latitudes and longitudes from the geometry column
     polygon_gdf['lon'] = polygon_gdf['geometry'].centroid.x
     polygon_gdf['lat'] = polygon_gdf['geometry'].centroid.y
@@ -226,17 +187,30 @@ def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, source=None
                 variable_name: (['lat', 'lon'], mask)},
                 coords={'lat': (['lat'], lats),
                 'lon': (['lon'], lons)})
-        ds = add_variable_attributes(ds=ds, variable_name=variable_name, long_name=long_name, 
-                                     units=units, source=source, time=time, cell_size=cell_size, value_per_area=value_per_area, zero_is_value=zero_is_value)
-        
     else:
         grid_value = replace_special_characters(grid_value)
         ds = xr.Dataset({
                 grid_value: (['lat', 'lon'], mask)},
                 coords={'lat': (['lat'], lats),
                 'lon': (['lon'], lons)})
+    return ds
 
-        ds = add_variable_attributes(ds=ds, variable_name=grid_value, long_name=long_name, 
+def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, source=None, time=None, variable_name=None, cell_size=1, value_per_area=False, zero_is_value=False):
+
+    ds = gridded_poly_2_dataset(polygon_gdf=polygon_gdf, grid_value=grid_value, variable_name=variable_name, cell_size=cell_size)
+    variable_name = replace_special_characters(variable_name)
+    # create and add grid area variable
+    gdf = create.create_gridded_polygon(cell_size=1, grid_area="yes")
+    grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
+    attrs = {'long_name': "Area of Grids", 'units': "m2"}
+    grid_ds["grid_area"].attrs = attrs
+    # merge with the dataset
+    ds = xr.merge([ds, grid_ds])
+    if value_per_area:
+        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+ 
+    variable_name = variable_name if variable_name else grid_value
+    ds = add_variable_attributes(ds=ds, variable_name=variable_name, long_name=long_name, 
                                      units=units, source=source, time=time, cell_size=cell_size, value_per_area=value_per_area, zero_is_value=zero_is_value)
 
     return ds
@@ -304,7 +278,13 @@ def da_to_ds(da, variable_name, long_name, units, source=None, time=None, cell_s
 
     # add grid area variable
     cell_size = abs(float(ds['lat'].diff('lat').values[0]))
-    grid_ds = create.create_global_xarray_dataset(pixel_width_deg=cell_size, pixel_height_deg=cell_size)
+    
+    # create and add grid area variable
+    gdf = create.create_gridded_polygon(cell_size=1, grid_area="yes")
+    grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
+    attrs = {'long_name': "Area of Grids", 'units': "m2"}
+    grid_ds["grid_area"].attrs = attrs
+    # merge with the dataset
     ds = xr.merge([ds, grid_ds])
     if value_per_area:
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
@@ -349,12 +329,12 @@ def determine_long_name_line(long_name, fold_field, variable_name):
 
 def dataframe_stats_line(dataframe, fold_field=None, fold_function="sum", verbose=False):
     if fold_function.lower() == "sum":
-        if fold_field is None or fold_field == "length_sum":
+        if fold_field is None or fold_field == "length_m":
             dataframe = calculate.calculate_geometry_attributes(dataframe)
             global_summary_stats = dataframe['length_m'].sum()
             if verbose:
                 print(f"Global stats before gridding: {global_summary_stats:.2f}")
-            return global_summary_stats
+            return global_summary_stats * 1e-3
     else:
         raise ValueError(f"Unsupported fold_function: {fold_function}. Choose 'sum'. or set verbose=False")
     
@@ -403,23 +383,6 @@ def dataframe_stats_point(dataframe, fold_field=None, fold_function="sum"):
         raise ValueError(f"Unsupported combination of fold_field: {fold_field} and fold_function: {fold_function}")
     return global_summary_stats
 
-# def xarray_dataset_stats(dataset, variable_name, value_per_area=False):
-#     if value_per_area:
-#         global_gridded_stats = (dataset[variable_name] * dataset["grid_area"]).sum().item()
-#     else:
-#         global_gridded_stats = (dataset[variable_name]).sum().item()
-#     return global_gridded_stats * 1e-6
-
-# def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per_area=False):
-#     if variable_name is None and fold_field:
-#         variable_name = fold_field
-#     elif variable_name and fold_field:
-#         variable_name = variable_name
-#     if value_per_area:
-#         global_gridded_stats = (dataset[variable_name] * dataset["grid_area"]).sum().item()
-#     else:
-#         global_gridded_stats = (dataset[variable_name]).sum().item()
-#     return global_gridded_stats
 
 def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per_area=None):
     if variable_name is None and fold_field:
@@ -430,7 +393,7 @@ def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per
         global_gridded_stats = (dataset[variable_name] * dataset["grid_area"]).sum().item()
     else:
         global_gridded_stats = (dataset[variable_name]).sum().item()
-    return global_gridded_stats * 1e-6
+    return global_gridded_stats
 
 def save_to_nc(ds, output_directory=None, output_filename=None, base_filename=None):
     if output_directory != None:
@@ -439,7 +402,73 @@ def save_to_nc(ds, output_directory=None, output_filename=None, base_filename=No
         else:
             ds.to_netcdf(output_directory + base_filename + ".nc")
             
+def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function='sum', x_offset=0.0001, y_offset=0.0001):
+    # Adjust points to ensure they are within or correctly intersecting polygons
+    points_gdf = adjust_points(points_gdf, polygons_gdf, x_offset, y_offset)
+    
+    # Perform spatial join with 'intersects' operation
+    points_within_polygons = gpd.sjoin(points_gdf, polygons_gdf, predicate='intersects')
+    
+    # If field_name is provided, convert the column to numeric
+    if fold_field:
+        points_within_polygons[fold_field] = pd.to_numeric(points_within_polygons[fold_field], errors='coerce')
+        variable_name = replace_special_characters(fold_field)
+        # Group by polygon and compute summary statistic based on operation
+        if fold_function.lower() == 'sum':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].sum().reset_index(name=variable_name)
+        elif fold_function.lower() == 'mean':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].mean().reset_index(name=variable_name)
+        elif fold_function.lower() == 'max':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].max().reset_index(name=variable_name)
+        elif fold_function.lower() == 'std':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].std().reset_index(name=variable_name)
+        else:
+            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+    
+        # Merge summary statistics with polygons GeoDataFrame
+        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_index=True, right_on='index_right')
+        print(polygons_gdf[variable_name].sum())
+    
+    else:
+        # Count the points within each polygon
+        polygon_counts = points_within_polygons.groupby('index_right').size().reset_index(name='count')
+        # Add the count to the polygons GeoDataFrame
+        polygons_gdf['count'] = polygons_gdf.index.to_series().map(polygon_counts.set_index('index_right')['count']).fillna(0).astype(int)
+    
+    return polygons_gdf
 
+def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function='sum', x_offset=0.0001, y_offset=0.0001):
+    # Ensure both GeoDataFrames use the same CRS
+    if polygons_gdf.crs != points_gdf.crs:
+        points_gdf = points_gdf.to_crs(polygons_gdf.crs)
+        
+    # Adjust points to ensure they are within or correctly intersecting polygons
+    points_gdf = adjust_points(points_gdf, polygons_gdf, x_offset, y_offset)
+    
+    # Perform intersection
+    intersections = gpd.overlay(points_gdf, polygons_gdf, how='intersection')
+    
+    # If fold_field is provided, convert the column to numeric
+    if fold_field:
+        intersections[fold_field] = pd.to_numeric(intersections[fold_field], errors='coerce')
+        # Group by polygon and compute summary statistic based on operation
+        if fold_function.lower() == 'sum':
+            intersections = intersections.groupby('uid')[fold_field].sum().reset_index()
+        elif fold_function.lower() == 'mean':
+            intersections = intersections.groupby('uid')[fold_field].mean().reset_index()
+        elif fold_function.lower() == 'max':
+            intersections = intersections.groupby('uid')[fold_field].max().reset_index()
+        elif fold_function.lower() == 'std':
+            intersections = intersections.groupby('uid')[fold_field].std().reset_index()
+        else:
+            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+
+    else:
+        intersections = intersections.groupby('uid').size().reset_index(name='count')
+    
+    joined_gdf = polygons_gdf.merge(intersections, on='uid', how='left')
+    return joined_gdf
+    
 def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'):
     # Ensure both GeoDataFrames use the same CRS
     if polygons_gdf.crs != lines_gdf.crs:
@@ -488,69 +517,78 @@ def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'
     polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_on='polygon_index', right_on='polygon_index')
     return polygons_gdf
 
-
-def poly_intersect(polygons_gdf, poly_gdf, fold_function='sum', fraction=False):
+def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'):
+    
     # Ensure both GeoDataFrames use the same CRS
-    if polygons_gdf.crs != poly_gdf.crs:
-        poly_gdf = poly_gdf.to_crs(polygons_gdf.crs)
-        
-    before = calculate.calculate_geometry_attributes(poly_gdf)
-    print(before["area_m2"].sum())
+    if polygons_gdf.crs != lines_gdf.crs:
+        lines_gdf = lines_gdf.to_crs(polygons_gdf.crs)
     
-    # Calculate the intersection between polygons and poly_gdf
-    intersections = gpd.overlay(poly_gdf, polygons_gdf, how='intersection')
+    # Calculate geometry attributes
+    polygons_gdf = calculate.calculate_geometry_attributes(input_gdf=polygons_gdf, column_name="grid_area")
+    
+    # Perform intersection
+    intersections = gpd.overlay(lines_gdf, polygons_gdf, how='intersection')
+    
+    # Calculate geometry attributes for intersections
+    intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="length_m")
 
-    # Calculate the geometry attributes for intersections
-    intersections = calculate.calculate_geometry_attributes(intersections)
-    print(intersections["area_m2"].sum())
-    
-    
-    if fraction:
-        # Always calculate the total area
-        total_area_stats = intersections.groupby('id')['area_m2'].sum().reset_index(name='total_area')
-        # Calculate the geometry attributes for the original polygons
-        poly_gdf = calculate.calculate_geometry_attributes(poly_gdf)
-        polygons_gdf = calculate.calculate_geometry_attributes(polygons_gdf)
-        
-        # Calculate the fraction of the area of each intersected polygon
-        intersections = intersections.merge(
-            polygons_gdf[['id', 'area_m2']], 
-            on='id', 
-            suffixes=('', '_grid')
-        )
-        intersections['frac'] = intersections['area_m2'] / intersections['area_m2_grid']
-        
-        # Apply fold_function to the fraction column
+    # If fold_field is provided, convert the column to numeric
+    if fold_field:
+        intersections[fold_field] = pd.to_numeric(intersections[fold_field], errors='coerce')
+        # variable_name = replace_special_characters(fold_field)
+        # Group by polygon and compute summary statistic based on operation
         if fold_function.lower() == 'sum':
-            summary_stats = intersections.groupby('id')['frac'].sum().reset_index(name="frac")
+            intersections = intersections.groupby('uid')[fold_field].sum().reset_index()
         elif fold_function.lower() == 'mean':
-            summary_stats = intersections.groupby('id')['frac'].mean().reset_index(name="frac")
+            intersections = intersections.groupby('uid')[fold_field].mean().reset_index()
         elif fold_function.lower() == 'max':
-            summary_stats = intersections.groupby('id')['frac'].max().reset_index(name="frac")
+            intersections = intersections.groupby('uid')[fold_field].max().reset_index()
         elif fold_function.lower() == 'std':
-            summary_stats = intersections.groupby('id')['frac'].std().reset_index(name="frac")
+            intersections = intersections.groupby('uid')[fold_field].std().reset_index()
         else:
-            raise ValueError(f"Unsupported operation: {fold_function}. Choose from 'sum', 'mean', 'max', 'std'.")
-        
-        summary_stats['frac'] = summary_stats['frac'].clip(upper=1)
-        summary_stats = summary_stats.merge(total_area_stats, how='left', on='id')
-        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_on='id', right_on='id')
+            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+
     else:
-        # Group by the polygon index and apply the fold function to the intersection areas
-        if fold_function.lower() == 'sum':
-            summary_stats = intersections.groupby('id')['area_m2'].sum().reset_index(name='area_sum')
-        elif fold_function.lower() == 'mean':
-            summary_stats = intersections.groupby('id')['area_m2'].mean().reset_index(name='area_mean')
-        elif fold_function.lower() == 'max':
-            summary_stats = intersections.groupby('id')['area_m2'].max().reset_index(name='area_max')
-        elif fold_function.lower() == 'std':
-            summary_stats = intersections.groupby('id')['area_m2'].std().reset_index(name='area_std')
-        else:
-            raise ValueError(f"Unsupported fold_function: {fold_function}. Choose from 'sum', 'mean', 'max', 'std'.")
-        
-        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_on='id', right_on='id')
+        if fold_function.lower() == "sum":
+            intersections = intersections.groupby('uid')['length_m'].sum().reset_index()
+        elif fold_function.lower() == "mean":
+            intersections = intersections.groupby('uid')['length_m'].mean().reset_index()
+        elif fold_function.lower() == "max":
+            intersections = intersections.groupby('uid')['length_m'].max().reset_index()
+        elif fold_function.lower() == "std":
+            intersections = intersections.groupby('uid')['length_m'].std().reset_index()
     
-    return polygons_gdf
+    joined_gdf = polygons_gdf.merge(intersections, on='uid', how='left')
+    return joined_gdf
+
+
+def poly_intersect(poly_gdf, polygons_gdf, fold_function="sum", fraction=False):
+    
+    # Calculate geometry attributes
+    poly_gdf = calculate.calculate_geometry_attributes(input_gdf=poly_gdf, column_name="raw_area")
+    polygons_gdf = calculate.calculate_geometry_attributes(input_gdf=polygons_gdf, column_name="grid_area")
+    
+    # Perform intersection
+    intersections = gpd.overlay(poly_gdf, polygons_gdf, how='intersection')
+    
+    # Calculate geometry attributes for intersections
+    intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="in_area")
+
+    if fraction:
+        intersections["frac"] = intersections["in_area"] / intersections["grid_area"]
+        intersections = intersections.groupby('uid')['frac'].sum().reset_index()
+    else:
+        if fold_function.lower() == "sum":
+            intersections = intersections.groupby('uid')['in_area'].sum().reset_index()
+        elif fold_function.lower() == "mean":
+            intersections = intersections.groupby('uid')['in_area'].mean().reset_index()
+        elif fold_function.lower() == "max":
+            intersections = intersections.groupby('uid')['in_area'].max().reset_index()
+        elif fold_function.lower() == "std":
+            intersections = intersections.groupby('uid')['in_area'].std().reset_index()
+    
+    joined_gdf = polygons_gdf.merge(intersections, on='uid', how='left')
+    return joined_gdf
 
 
 def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
@@ -655,7 +693,12 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
     -------
     np.ndarray
         The reprojected data as a numpy array.
+    float
+        The size of the cell in x direction.
+    float
+        The size of the cell in y direction.
     """
+
     # Define the target CRS (WGS84)
     dst_crs = CRS.from_epsg(4326)
 
@@ -735,7 +778,12 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
             )
             dst_array = final_array
 
-    return dst_array
+    # Calculate the cell size in x and y direction
+    x_cell_size = (dst_extent[2] - dst_extent[0]) / dst_width
+    y_cell_size = (dst_extent[3] - dst_extent[1]) / dst_height
+
+    return dst_array, x_cell_size, y_cell_size
+
 
 
 def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="value/grid-cell", source=None, cell_size=1,
@@ -847,7 +895,8 @@ def xy_not_eq(raster_path, fold_function, variable_name, long_name, units, sourc
     # compute statistics
     result_df = compute_weighted_statistics(gdf=intersections, stat=fold_function)
     # Merge results with polygons_gdf
-    joined_gdf = polygons_gdf.merge(result_df, on='id', how='left')
+    joined_gdf = polygons_gdf.merge(result_df, on='uid', how='left')
+    variable_name = replace_special_characters(variable_name)
     ds = gridded_poly_2_xarray(polygon_gdf=joined_gdf, grid_value=fold_function, long_name=long_name, 
                                  units=units, source=source, time=time, variable_name=variable_name, cell_size=cell_size, 
                                  value_per_area=value_per_area, zero_is_value=zero_is_value)
@@ -892,25 +941,25 @@ def raster_to_polygon_gdf(raster_file):
 
 def compute_weighted_statistics(gdf, stat='sum'):
     if stat.lower() == 'sum':
-        result = gdf.groupby('id', as_index=False).apply(
+        result = gdf.groupby('uid', as_index=False).apply(
             lambda df: pd.Series({
                 'sum': (df['value'] * df['frac']).sum()
             }), include_groups=False
         ).reset_index()
     elif stat.lower() == 'mean':
-        result = gdf.groupby('id', as_index=False).apply(
+        result = gdf.groupby('uid', as_index=False).apply(
             lambda df: pd.Series({
                 'mean': (df['value'] * df['frac']).sum() / df['frac'].sum() if df['frac'].sum() != 0 else float('nan')
             }), include_groups=False
         ).reset_index()
     elif stat.lower() == 'max':
-        result = gdf.groupby('id', as_index=False).apply(
+        result = gdf.groupby('uid', as_index=False).apply(
             lambda df: pd.Series({
                 'max': (df['value'] * df['frac']).max()
             }), include_groups=False
         ).reset_index()
     elif stat.lower() == 'std':
-        result = gdf.groupby('id', as_index=False).apply(
+        result = gdf.groupby('uid', as_index=False).apply(
             lambda df: pd.Series({
                 'std': (((df['value'] - ((df['value'] * df['frac']).sum() / df['frac'].sum() if df['frac'].sum() != 0 else float('nan'))) ** 2 * df['frac']).sum() / df['frac'].sum()) ** 0.5 if df['frac'].sum() != 0 else float('nan')
             }), include_groups=False
@@ -921,8 +970,9 @@ def compute_weighted_statistics(gdf, stat='sum'):
     return result
 
 
+
 def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value/grid-cell", source=None, cell_size=1,
-                     time=None, zero_is_value=None, value_per_area=False, verbose=False):
+                     time=None, zero_is_value=None, value_per_area=False, resampling_method='bilinear', verbose=False):
     
     # Step-1: Check the cell size
     # Open the input raster using rasterio
@@ -934,24 +984,16 @@ def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value
         x_size = round(float(x_size), 3)
         y_size = round(float(y_size), 3)
 
-        if verbose and fold_function.lower() == "sum":
-            raster_sum = rasterio.open(input_raster).read(1).sum()
-            print(f"Global sum before gridding {raster_sum}")
-
-        if x_size > cell_size:
-            print("TODO: downscaling needed!")
+        if x_size != y_size or x_size > cell_size:
+            ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
+                           long_name=long_name, units=units, source=source, time=time, cell_size=cell_size, 
+                           value_per_area=value_per_area, zero_is_value=zero_is_value)
         else:
-            if x_size != y_size:
-                ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
-                               long_name=long_name, units=units, source=source, time=time, cell_size=cell_size, 
-                               value_per_area=value_per_area, zero_is_value=zero_is_value)
-            else:
-                # reproject and fill
-                array = reproject_and_fill(input_raster)
-                # re-grid
-                ds = regrid_array_2_ds(array=array, fold_function=fold_function, variable_name=variable_name, 
-                                       long_name=long_name, units=units, source=source, cell_size=1, time=time, zero_is_value=zero_is_value,
-                                       value_per_area=value_per_area, verbose=verbose)
+            # re-grid
+            ds = regrid_array_2_ds(array=array, fold_function=fold_function, variable_name=variable_name, 
+                                   long_name=long_name, units=units, source=source, cell_size=cell_size, 
+                                   time=time, zero_is_value=zero_is_value, value_per_area=value_per_area, 
+                                   verbose=verbose)
     
     return ds
 
