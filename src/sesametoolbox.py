@@ -12,11 +12,12 @@ import create
 import utils
 import calculate
 import plot
+import get
 import json
 
 def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_file_path=None, input_ds=None,
                  input_df=None, variable_name=None, long_name=None, units="value/grid-cell", source=None,
-                 filename=None, time=None, zero_is_value=None, value_per_area=None, verbose=False):
+                 time=None, output_directory=None, output_filename=None, zero_is_value=None, value_per_area=None, verbose=False):
     """
     Convert tabular data to a gridded dataset by spatially distributing values based on a NetCDF variable and a tabular column.
 
@@ -80,9 +81,16 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     cell_size = abs(float(input_ds['lat'].diff('lat').values[0]))
     cell_size_str = str(cell_size)
   
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json'), 'r') as file:
-        config = json.load(file)
-    country_ds = xr.load_dataset(config['file_paths']['Country_Fraction.1deg'])
+    # with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json'), 'r') as file:
+    #     config = json.load(file)
+    # country_ds = xr.load_dataset(config['file_paths']['Country_Fraction.1deg'])
+    base_directory = os.path.dirname(os.path.abspath(__file__))
+    if cell_size_str == "1" or cell_size_str == "1.0":
+        country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
+    elif cell_size_str == "0.5":
+        country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc")) 
+    else:
+        raise ValueError("Please re-grid the netcdf file to 1 or 0.5 degree.")
 
     input_ds, country_ds, a = utils.adjust_datasets(input_ds, country_ds, time)
     print(f"Distributing {variable_name} onto {netcdf_variable}.")
@@ -103,11 +111,18 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
 
     ds = utils.da_to_ds(da, variable_name, long_name, units, source=source, time=time, cell_size=cell_size,
                         zero_is_value=zero_is_value, value_per_area=value_per_area)
+    # save the xarray dataset
+    if output_directory:
+        if netcdf_file_path:
+            base_filename = os.path.splitext(os.path.basename(netcdf_file_path))[0]
+        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
+
     return ds
 
 
 
-def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, cell_size=1, netcdf_variable=None, zero_is_value=None, verbose=False, value_per_area=None):  
+def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, cell_size=1, netcdf_variable=None, output_directory=None, 
+                 output_filename=None, zero_is_value=None, value_per_area=False, verbose=False):  
     """
     Convert raster data (TIFF or netCDF) to a re-gridded xarray dataset.
 
@@ -163,6 +178,12 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
     else:
         # Print an error message for unrecognized file types
         print("Error: File type is not recognized. File type should be either TIFF or netCDF file.")
+
+    # save the xarray dataset
+    if output_directory:
+        if raster_path:
+            base_filename = os.path.splitext(os.path.basename(raster_path))[0]
+        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
 
     return ds
 
@@ -651,5 +672,62 @@ def average_variables(variables=None, dataset=None, new_variable_name=None, time
     """
     ds = calculate.average_variables(variables, dataset, new_variable_name, time, netcdf_directory)
     return ds
+
+
+def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid_area=None, cell_size=1, aggregation=None, method='sum', verbose=False):
+    """
+    Process gridded data from an xarray Dataset to generate tabular data for different jurisdictions.
+
+    Parameters:
+    -----------
+    input_netcdf_path : str, optional
+        Netcdf path containing path location. 
+    ds : xarray Dataset, optional
+        Gridded dataset containing spatial information.
+    variable : str, optional
+        Variable name to be processed. If None, all variables in the dataset (excluding predefined ones) will be considered.
+    time : str, optional
+        Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
+    grid_area : str, optional
+        Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
+    aggregation : str, optional
+        Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
+    method : str, optional
+        Aggregation method. Options: 'sum', 'mean', 'max'.
+
+    Returns:
+    --------
+    merged_df : pandas DataFrame
+        Tabular data for different jurisdictions, including ISO3 codes, variable values, and optional 'Year' column.
+    """
+   
+    df = utils.grid_2_table(input_netcdf_path=input_netcdf_path, ds=ds, variable=variable, time=time, 
+                           grid_area=grid_area, cell_size=cell_size, aggregation=aggregation, method=method, 
+                           verbose=verbose)
+    return df
+
+
+def get_netcdf_info(netcdf_path, variable_name=None):
+    """
+    Extract information about variables and dimensions from a NetCDF dataset.
+
+    Parameters
+    ----------
+    netcdf_path : str
+        The file path to the NetCDF dataset.
+    variable_name : str, optional
+        The prefix or complete name of the variable to filter. If not provided, all variables are included.
+
+    Returns
+    -------
+    tuple
+        A tuple containing lists of dimensions, short names, long names, units, & time values (if 'time' exists).
+    """
+
+    netcdf_info = get.get_netcdf_info(netcdf_path=netcdf_path, variable_name=variable_name)
+    return netcdf_info
+
+
+
 
 

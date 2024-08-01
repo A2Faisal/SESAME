@@ -6,7 +6,7 @@ import pyproj
 import numpy as np
 import xarray as xr
 import warnings
-import src.calculate as calculate
+import calculate
 import utils
 
 warnings.filterwarnings('ignore', category=FutureWarning)
