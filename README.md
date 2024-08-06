@@ -9,7 +9,7 @@ Data on human and non-human systems are typically archived in very different way
 - Foster interdisciplinary collaboration and research by providing accessible and integrated datasets.
 
 ## Software Package
-SESAME Software package is dependent on multiple python files. Users are requested to download the files from SESAME/src/ folder. Software documentation will be available soon.
+SESAME Software package is dependent on multiple python files. Users are requested to download the files from src folder. Software documentation will be available soon.
 
 ## Human-Earth Atlas
 Datasets can be downloaded in NetCDF format from {link}. Detailed dataset documentation file can be found in [Google Spreadsheet](https://docs.google.com/spreadsheets/d/17rn570hyfLm0OsSmbTxHcVGPS4Vy27EpWAI02Rqu-WQ/edit?usp=sharing). 
