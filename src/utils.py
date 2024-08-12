@@ -989,7 +989,7 @@ def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value
         x_size = round(float(x_size), 3)
         y_size = round(float(y_size), 3)
 
-        if x_size != y_size or x_size > cell_size:
+        if x_size != y_size or cell_size > x_size:
             ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
                            long_name=long_name, units=units, source=source, time=time, cell_size=cell_size, 
                            value_per_area=value_per_area, zero_is_value=zero_is_value)
