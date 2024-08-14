@@ -425,6 +425,8 @@ def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function=
             summary_stats = points_within_polygons.groupby('index_right')[fold_field].mean().reset_index(name=variable_name)
         elif fold_function.lower() == 'max':
             summary_stats = points_within_polygons.groupby('index_right')[fold_field].max().reset_index(name=variable_name)
+        elif fold_function.lower() == 'min':
+            summary_stats = points_within_polygons.groupby('index_right')[fold_field].min().reset_index(name=variable_name)            
         elif fold_function.lower() == 'std':
             summary_stats = points_within_polygons.groupby('index_right')[fold_field].std().reset_index(name=variable_name)
         else:
@@ -463,10 +465,12 @@ def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function=
             intersections = intersections.groupby('uid')[fold_field].mean().reset_index()
         elif fold_function.lower() == 'max':
             intersections = intersections.groupby('uid')[fold_field].max().reset_index()
+        elif fold_function.lower() == 'min':
+            intersections = intersections.groupby('uid')[fold_field].min().reset_index()
         elif fold_function.lower() == 'std':
             intersections = intersections.groupby('uid')[fold_field].std().reset_index()
         else:
-            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', min, 'std'.")
 
     else:
         intersections = intersections.groupby('uid').size().reset_index(name='count')
@@ -474,53 +478,6 @@ def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function=
     joined_gdf = polygons_gdf.merge(intersections, on='uid', how='left')
     return joined_gdf
     
-def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'):
-    # Ensure both GeoDataFrames use the same CRS
-    if polygons_gdf.crs != lines_gdf.crs:
-        lines_gdf = lines_gdf.to_crs(polygons_gdf.crs)
-    
-    # Add index columns to preserve original indices
-    polygons_gdf = polygons_gdf.reset_index().rename(columns={'index': 'polygon_index'})
-    lines_gdf = lines_gdf.reset_index().rename(columns={'index': 'line_index'})
-    
-    # Calculate the intersection between polygons and lines
-    intersections = gpd.overlay(lines_gdf, polygons_gdf, how='intersection')
-
-    # Calculate the length of each intersected line segment
-    intersections = calculate.calculate_geometry_attributes(intersections)
-
-    # If fold_field is provided, convert the column to numeric
-    if fold_field:
-        intersections[fold_field] = pd.to_numeric(intersections[fold_field], errors='coerce')
-        variable_name = replace_special_characters(fold_field)
-        # Group by polygon and compute summary statistic based on operation
-        if fold_function.lower() == 'sum':
-            summary_stats = intersections.groupby('polygon_index')[fold_field].sum().reset_index(name=variable_name)
-        elif fold_function.lower() == 'mean':
-            summary_stats = intersections.groupby('polygon_index')[fold_field].mean().reset_index(name=variable_name)
-        elif fold_function.lower() == 'max':
-            summary_stats = intersections.groupby('polygon_index')[fold_field].max().reset_index(name=variable_name)
-        elif fold_function.lower() == 'std':
-            summary_stats = intersections.groupby('polygon_index')[fold_field].std().reset_index(name=variable_name)
-        else:
-            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
-    
-    else:
-        # Group by the polygon index and apply the fold function to the intersection lengths
-        if fold_function.lower() == 'sum':
-            summary_stats = intersections.groupby('polygon_index')['length_m'].sum().reset_index(name='length_sum')
-        elif fold_function.lower() == 'mean':
-            summary_stats = intersections.groupby('polygon_index')['length_m'].mean().reset_index(name='length_mean')
-        elif fold_function.lower() == 'max':
-            summary_stats = intersections.groupby('polygon_index')['length_m'].max().reset_index(name='length_max')
-        elif fold_function.lower() == 'std':
-            summary_stats = intersections.groupby('polygon_index')['length_m'].std().reset_index(name='length_std')
-        else:
-            raise ValueError(f"Unsupported fold_function: {fold_function}. Choose from 'sum', 'mean', 'max', 'std'.")
-    
-    # Merge summary statistics with polygons GeoDataFrame
-    polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_on='polygon_index', right_on='polygon_index')
-    return polygons_gdf
 
 def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'):
     
@@ -548,10 +505,12 @@ def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'
             intersections = intersections.groupby('uid')[fold_field].mean().reset_index()
         elif fold_function.lower() == 'max':
             intersections = intersections.groupby('uid')[fold_field].max().reset_index()
+        elif fold_function.lower() == 'min':
+            intersections = intersections.groupby('uid')[fold_field].min().reset_index()
         elif fold_function.lower() == 'std':
             intersections = intersections.groupby('uid')[fold_field].std().reset_index()
         else:
-            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', min, 'std'.")
 
     else:
         if fold_function.lower() == "sum":
@@ -560,6 +519,8 @@ def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'
             intersections = intersections.groupby('uid')['length_m'].mean().reset_index()
         elif fold_function.lower() == "max":
             intersections = intersections.groupby('uid')['length_m'].max().reset_index()
+        elif fold_function.lower() == "min":
+            intersections = intersections.groupby('uid')['length_m'].min().reset_index()
         elif fold_function.lower() == "std":
             intersections = intersections.groupby('uid')['length_m'].std().reset_index()
     
@@ -589,6 +550,8 @@ def poly_intersect(poly_gdf, polygons_gdf, fold_function="sum", fraction=False):
             intersections = intersections.groupby('uid')['in_area'].mean().reset_index()
         elif fold_function.lower() == "max":
             intersections = intersections.groupby('uid')['in_area'].max().reset_index()
+        elif fold_function.lower() == "min":
+            intersections = intersections.groupby('uid')['in_area'].min().reset_index()
         elif fold_function.lower() == "std":
             intersections = intersections.groupby('uid')['in_area'].std().reset_index()
     
@@ -866,8 +829,12 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
             da_agg = da_agg_nan.fillna(0)
     elif fold_function.upper() == 'MAX':
         da_agg = da.max(dim=['lat_factor', 'lon_factor'])
+    elif fold_function.upper() == 'MIN':
+        da_agg = da.min(dim=['lat_factor', 'lon_factor'])
+    elif fold_function.upper() == 'STD':
+        da_agg = da.std(dim=['lat_factor', 'lon_factor'])
     else:
-        raise ValueError("Conversion should be either SUM, MEAN, or MAX")
+        raise ValueError("Conversion should be either SUM, MEAN, MAX, MIN or STD")
 
     if verbose and fold_function.upper() == 'SUM':
         print(f"Raw global {fold_function}: {raw_global_value:.3f}")
@@ -963,6 +930,12 @@ def compute_weighted_statistics(gdf, stat='sum'):
                 'max': (df['value'] * df['frac']).max()
             }), include_groups=False
         ).reset_index()
+    elif stat.lower() == 'min':
+        result = gdf.groupby('uid', as_index=False).apply(
+            lambda df: pd.Series({
+                'max': (df['value'] * df['frac']).min()
+            }), include_groups=False
+        ).reset_index()
     elif stat.lower() == 'std':
         result = gdf.groupby('uid', as_index=False).apply(
             lambda df: pd.Series({
@@ -970,7 +943,7 @@ def compute_weighted_statistics(gdf, stat='sum'):
             }), include_groups=False
         ).reset_index()
     else:
-        raise ValueError("Unsupported statistic specified. Choose from 'sum', 'mean', 'max', 'std'.")
+        raise ValueError("Unsupported statistic specified. Choose from 'sum', 'mean', 'max', 'min, 'std'.")
 
     return result
 
@@ -1117,6 +1090,8 @@ def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid
                 print(f"Global gridded {method}: {ds_var.mean().item()}")
             elif method.upper() == "MAX":
                 print(f"Global gridded {method}: {ds_var.max().item()}")
+            elif method.upper() == "MIN":
+                print(f"Global gridded {method}: {ds_var.min().item()}")
             elif method.upper() == "STD":
                 print(f"Global gridded {method}: {ds_var.std().item()}")
             else:
@@ -1131,6 +1106,8 @@ def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid
             data = ds_var.mean()
         elif method.upper() == "MAX":
             data = ds_var.max()
+        elif method.upper() == "MIN":
+            data = ds_var.min()
         elif method.upper() == "STD":
             data = ds_var.std()
         else:
