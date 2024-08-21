@@ -728,6 +728,33 @@ def get_netcdf_info(netcdf_path, variable_name=None):
     return netcdf_info
 
 
+def country_2_iso3(df, column):
+    """
+    Convert country names in a DataFrame column to their corresponding ISO3 country codes.
 
+    This function reads a JSON file containing country names and their corresponding ISO3 codes, then 
+    maps the values from the specified column in the DataFrame to their ISO3 codes based on the JSON data. 
+    The resulting ISO3 codes are added as a new column named 'ISO3'.
+
+    Args:
+        df (pandas.DataFrame): The DataFrame containing a column with country names.
+        column (str): The name of the column in the DataFrame that contains country names.
+
+    Returns:
+        pandas.DataFrame: The original DataFrame with an additional 'ISO3' column containing the ISO3 country codes.
+
+    Raises:
+        FileNotFoundError: If the JSON file containing country mappings cannot be found.
+        KeyError: If the specified column is not present in the DataFrame.
+    """
+
+    # Convert country names to ISO3
+    base_directory = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(base_directory, "Names.json")
+    with open(json_path, 'r') as file:
+        country_iso3_data = json.load(file)
+        # Map the "Country" column to the new "ISO3" column
+        df['ISO3'] = df[column].map(country_iso3_data)
+    return df
 
 
