@@ -755,6 +755,11 @@ def country_2_iso3(df, column):
         country_iso3_data = json.load(file)
         # Map the "Country" column to the new "ISO3" column
         df['ISO3'] = df[column].map(country_iso3_data)
+        # Print rows where the specified column has NaN values
+        nan_iso3 = df[df["ISO3"].isna()]
+        iso3_not_found = nan_iso3[column].unique().tolist()
+        if iso3_not_found is not None:
+            print(iso3_not_found)
     return df
 
 
