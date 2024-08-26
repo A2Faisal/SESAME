@@ -759,7 +759,7 @@ def country_2_iso3(df, column):
         nan_iso3 = df[df["ISO3"].isna()]
         iso3_not_found = nan_iso3[column].unique().tolist()
         if iso3_not_found is not None:
-            print(iso3_not_found)
+            print(f"Country Not Found: {iso3_not_found}")
     return df
 
 
