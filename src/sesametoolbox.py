@@ -758,7 +758,8 @@ def country_2_iso3(df, column):
         # Print rows where the specified column has NaN values
         nan_iso3 = df[df["ISO3"].isna()]
         iso3_not_found = nan_iso3[column].unique().tolist()
-        if iso3_not_found is not None:
+        # Check if the list is not empty before printing
+        if iso3_not_found:
             print(f"Country Not Found: {iso3_not_found}")
     return df
 
