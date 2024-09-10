@@ -80,10 +80,10 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     # check the netcdf resolution
     cell_size = abs(float(input_ds['lat'].diff('lat').values[0]))
     cell_size_str = str(cell_size)
+
+    # check and print dataframe's iso3 with country fraction dataset
+    utils.check_iso3_with_country_ds(input_df, cell_size_str)
   
-    # with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json'), 'r') as file:
-    #     config = json.load(file)
-    # country_ds = xr.load_dataset(config['file_paths']['Country_Fraction.1deg'])
     base_directory = os.path.dirname(os.path.abspath(__file__))
     if cell_size_str == "1" or cell_size_str == "1.0":
         country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   

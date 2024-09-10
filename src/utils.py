@@ -1147,3 +1147,21 @@ def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid
         print(f"Global tabular {method_upper}: {getattr(merged_df[var], method)()}")
 
     return merged_df
+
+
+def check_iso3_with_country_ds(df, cell_size_str):
+    base_directory = os.path.dirname(os.path.abspath(__file__))
+    
+    if cell_size_str == "1" or cell_size_str == "1.0":
+        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
+    elif cell_size_str == "0.5":
+        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc")) 
+    else:
+        raise ValueError("Please re-grid the netcdf file to 1 or 0.5 degree.")
+    cntry_vars = [var for var in cntry.variables if var not in cntry.coords]
+    df_list = list(df["ISO3"].unique())
+    # Find unmatched ISO3 countries
+    unmatched_iso3 = list(set(df_list) - set(cntry_vars))
+    # Check if the list is not empty before printing
+    if unmatched_iso3:
+        print(f"Country Not Found: {unmatched_iso3}")
