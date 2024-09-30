@@ -109,7 +109,7 @@ def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue'
     Returns:
     - None, displays the plot.
     """
-
+    '''
     if dataset is None and netcdf_directory is None:
         raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
     elif dataset is not None and netcdf_directory is not None:
@@ -124,11 +124,35 @@ def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue'
         raise ValueError("Only one of 'xarray dataset2' or 'netcdf_directory2' should be provided.")
     
     if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
+        dataset = xr.load_dataset(netcdf_directory2)
     
     # Ensure the specified variable for the x-axis is in the dataset
     if variable1 not in dataset:
         raise ValueError(f"Variable '{variable1}' not found in the dataset.")
+
+    '''
+    # Check and load dataset for variable1
+    if dataset is None and netcdf_directory is None:
+        raise ValueError("Either 'dataset' or 'netcdf_directory' must be provided for variable1.")
+    elif dataset is None:
+        dataset = xr.load_dataset(netcdf_directory)
+    elif netcdf_directory is not None:
+        raise ValueError("Only one of 'dataset' or 'netcdf_directory' should be provided for variable1.")
+    
+    # Check and load dataset2 for variable2, or allow variable2 to come from dataset
+    if dataset2 is None and netcdf_directory2 is None:
+        dataset2 = dataset  # If no second dataset or directory is provided, use the same dataset
+    elif dataset2 is None:
+        dataset2 = xr.load_dataset(netcdf_directory2)
+    elif netcdf_directory2 is not None:
+        raise ValueError("Only one of 'dataset2' or 'netcdf_directory2' should be provided for variable2.")
+    
+    # Ensure both variables exist in their respective datasets
+    if variable1 not in dataset:
+        raise ValueError(f"Variable '{variable1}' not found in the dataset.")
+    
+    if variable2 not in dataset2:
+        raise ValueError(f"Variable '{variable2}' not found in the second dataset.")
     
     # Get data for the x-axis
     data1 = dataset[variable1].values.flatten()
@@ -465,7 +489,7 @@ def plot_time_series(variable, dataset=None, fold_function='sum', plot_type='bot
     plt.show()
 
 
-def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', color_min=None, color_max=None, levels=10,output_dir=None, filename=None, netcdf_directory=None):
+def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', color_min=None, color_max=None, levels=10, output_dir=None, filename=None, netcdf_directory=None):
     
     
     if dataset is None and netcdf_directory is None:

@@ -197,12 +197,11 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
     elif poly_gdf is not None and shapefile_path is not None:
         raise ValueError("Only one of 'polygons geodataframe' or 'shapefile directory' should be provided.")
 
-    # create gridded polygon
-    polygons_gdf = create.create_gridded_polygon(cell_size=cell_size, out_polygon_path=None, grid_area=False)
-    
-    # spatial join
     if shapefile_path:
         poly_gdf = gpd.read_file(shapefile_path)
+
+    # create gridded polygon
+    polygons_gdf = create.create_gridded_polygon(cell_size=cell_size, out_polygon_path=None, grid_area=False)
     
     if attr_field is not None:
         unique_rows = poly_gdf[attr_field].unique().tolist()
@@ -214,33 +213,32 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
             filtered_gdf = poly_gdf[poly_gdf[attr_field] == filter_var].copy()
             # Reset the index to ensure sequential indexing
             filtered_gdf.reset_index(drop=True, inplace=True)
-            joined_gdf = utils.poly_intersect(poly_gdf=filtered_gdf, polygons_gdf=polygons_gdf, fold_function=fold_function, fraction=fraction)
 
             # Determine fold_field, long_name, and units for the current iteration
             grid_value = "frac" if fraction else "in_area"
             current_long_name = utils.reverse_replace_special_characters(filter_var)
             current_units = utils.determine_units_poly(units, value_per_area, fraction)
 
-
-            # Convert joined GeoDataFrame to xarray dataset
-            ds_var = utils.gridded_poly_2_xarray(
-                polygon_gdf=joined_gdf,
-                grid_value=grid_value,
-                long_name=current_long_name,
-                units=current_units,
-                source=source,
-                time=time,
-                variable_name=filter_var,
-                value_per_area=value_per_area,
-                zero_is_value=zero_is_value
-            )
+            # Convert GeoDataFrame to xarray dataset
+            ds_var = utils.poly_intersect(poly_gdf=filtered_gdf,
+                                            polygons_gdf=polygons_gdf, 
+                                            variable_name=filter_var, 
+                                            long_name=current_long_name,
+                                            units=current_units,
+                                            source=source,
+                                            time=time,
+                                            cell_size=cell_size,
+                                            fold_function=fold_function, 
+                                            fraction=fraction,
+                                            value_per_area=value_per_area,
+                                            zero_is_value=zero_is_value)
 
             # Print or process verbose information
             if verbose:
                 global_summary_stats = utils.dataframe_stats_poly(dataframe=filtered_gdf, fold_function=fold_function)
                 print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km2.")
                 global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=filter_var, fold_field=grid_value,
-                                                              value_per_area=fraction) * 1e-6
+                                                              value_per_area=fraction, cell_size=cell_size) * 1e-6
                 print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km2.")
 
             print("\n")
@@ -250,30 +248,31 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
         ds = xr.merge(dataset_list)
         
     else:
-        joined_gdf = utils.poly_intersect(poly_gdf=poly_gdf, polygons_gdf=polygons_gdf, fold_function=fold_function, fraction=fraction)
-
+        
         # Determine fold_field, long_name, and units
         grid_value = "frac" if fraction else "in_area"
         long_name = utils.determine_long_name_poly(variable_name, long_name, fold_function)
         units = utils.determine_units_poly(units, value_per_area, fraction)
         
-        ds = utils.gridded_poly_2_xarray(
-            polygon_gdf=joined_gdf,
-            grid_value=grid_value,
-            long_name=long_name,
-            units=units,
-            source=source,
-            time=time,
-            variable_name=variable_name,
-            value_per_area=value_per_area,
-            zero_is_value=zero_is_value
-        )
+        # Convert GeoDataFrame to xarray dataset
+        ds = utils.poly_intersect(poly_gdf=poly_gdf,
+                                        polygons_gdf=polygons_gdf, 
+                                        variable_name=variable_name, 
+                                        long_name=long_name,
+                                        units=units,
+                                        source=source,
+                                        time=time,
+                                        cell_size=cell_size,
+                                        fold_function=fold_function, 
+                                        fraction=fraction,
+                                        value_per_area=value_per_area,
+                                        zero_is_value=zero_is_value)
 
         if verbose:
             global_summary_stats = utils.dataframe_stats_poly(dataframe=poly_gdf, fold_function=fold_function)
             print(f"Global stats before gridding : {global_summary_stats:.2f} km2.")
             global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=grid_value,
-                                                              value_per_area=fraction) * 1e-6
+                                                              value_per_area=fraction, cell_size=cell_size) * 1e-6
             print(f"Global stats after gridding: {global_gridded_stats:.2f} km2.")
     
     # save the xarray dataset
@@ -281,7 +280,8 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
         if shapefile_path:
             base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
-    return ds    
+    return ds  
+  
     
     
 def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter/grid-cell", source=None, time=None, 
@@ -322,6 +322,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
                 units=current_units,
                 source=source,
                 time=time,
+                cell_size=cell_size,
                 variable_name=filter_var,
                 value_per_area=value_per_area,
                 zero_is_value=zero_is_value
@@ -332,7 +333,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
                 global_summary_stats = utils.dataframe_stats_line(dataframe=filtered_gdf, fold_field=fold_field, fold_function=fold_function)
                 print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km.")
                 var_name = utils.replace_special_characters(filter_var)
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_area) * 1e-3
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_area, cell_size=cell_size) * 1e-3
                 print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km.")
 
             print("\n")
@@ -355,6 +356,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
             units=units,
             source=source,
             time=time,
+            cell_size=cell_size,
             variable_name=variable_name,
             value_per_area=value_per_area,
             zero_is_value=zero_is_value
@@ -363,7 +365,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
         if verbose:
             global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, fold_field=fold_field, fold_function=fold_function)
             print(f"Global stats before gridding : {global_summary_stats:.2f} km.")
-            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_area) * 1e-3
+            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_area, cell_size=cell_size) * 1e-3
             print(f"Global stats after gridding: {global_gridded_stats:.2f} km.")
     
     # save the xarray dataset
@@ -413,6 +415,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
                 units=current_units,
                 source=source,
                 time=time,
+                cell_size=cell_size,
                 variable_name=filter_var,
                 value_per_area=value_per_area,
                 zero_is_value=zero_is_value
@@ -423,7 +426,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
                 global_summary_stats = utils.dataframe_stats_point(dataframe=filtered_gdf, fold_field=current_fold_field, fold_function=fold_function)
                 print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f}")
                 var_name = utils.replace_special_characters(filter_var)
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_area)
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_area, cell_size=cell_size)
                 print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f}")
 
             print("\n")
@@ -447,6 +450,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
             units=units,
             source=source,
             time=time,
+            cell_size=cell_size,
             variable_name=variable_name,
             value_per_area=value_per_area,
             zero_is_value=zero_is_value
@@ -455,7 +459,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
         if verbose:
             global_summary_stats = utils.dataframe_stats_point(dataframe=points_gdf, fold_field=fold_field, fold_function=fold_function)
             print(f"Global stats before gridding : {global_summary_stats:.2f}")
-            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, value_per_area=value_per_area)
+            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, value_per_area=value_per_area, cell_size=cell_size)
             print(f"Global stats after gridding: {global_gridded_stats:.2f}")
     
     # save the xarray dataset

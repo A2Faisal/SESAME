@@ -23,6 +23,11 @@ import get
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
 
+warning_message = (
+    "The land fraction data is not available at the resolution you requested, which prevents taking into account the portion of coastal grid cells that are not land.\n"
+    "Instead, the calculated values will be referenced to the total grid area per cell."
+)
+
 global_attr = {'Project': 'Surface Earth System Analysis and Modeling Environment (SESAME)',
                'Research Group': 'Integrated Earth System Dynamics',
                'Institution': 'McGill University',
@@ -159,7 +164,10 @@ def add_variable_attributes(ds, variable_name, long_name, units, source=None, ti
     
     return ds
 
-def gridded_poly_2_dataset(polygon_gdf, grid_value, variable_name=None, cell_size=1):
+def gridded_poly_2_dataset(polygon_gdf, grid_value, cell_size, variable_name=None):
+
+    warnings.filterwarnings('ignore', category=FutureWarning)
+    warnings.filterwarnings('ignore', category=UserWarning)
     
     # Ensure the coordinate system is WGS84
     polygon_gdf.set_crs(epsg=4326, inplace=True)
@@ -168,11 +176,13 @@ def gridded_poly_2_dataset(polygon_gdf, grid_value, variable_name=None, cell_siz
     # Extract latitudes and longitudes from the geometry column
     polygon_gdf['lon'] = polygon_gdf['geometry'].centroid.x
     polygon_gdf['lat'] = polygon_gdf['geometry'].centroid.y
-    
-    # Define the x and y coordinates centered on -89.5 to +89.5 and -179.5 to +179.5
-    lons = np.arange(-179.5, 180, cell_size)
-    lats = np.arange(-89.5, 90, cell_size) [::-1]
-    
+
+    num_lon_points = int(360 / cell_size)
+    num_lat_points = int(180 / cell_size)
+
+    lons = np.linspace(-180 + cell_size/2, 180 - cell_size/2, num_lon_points)
+    lats = np.linspace(-90 + cell_size/2, 90 - cell_size/2, num_lat_points)
+
     # Create a meshgrid of coordinates
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
     
@@ -200,20 +210,47 @@ def gridded_poly_2_dataset(polygon_gdf, grid_value, variable_name=None, cell_siz
                 'lon': (['lon'], lons)})
     return ds
 
-def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, source=None, time=None, variable_name=None, cell_size=1, value_per_area=False, zero_is_value=False):
+def add_grid_variables(ds, cell_size, variable_name, value_per_area):
+    
+    # Ignore FutureWarning for other functions
+    warnings.filterwarnings('ignore', category=FutureWarning)
+
+    # Ensure UserWarning is always shown during this function
+    warnings.simplefilter('always', UserWarning)
+    
+    cell_size_str = str(cell_size)
+    if cell_size_str == "1" or cell_size_str == "1.0":
+        # Add grid area variable
+        base_directory = os.path.dirname(os.path.abspath(__file__))        
+        land_frac = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        # Merge with the dataset
+        ds = xr.merge([ds, land_frac])       
+        if value_per_area:
+            ds[variable_name] = ds[variable_name] / land_frac["land_area"]
+    else:
+        gdf = create.create_gridded_polygon(cell_size=cell_size, grid_area="yes")
+        grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
+        attrs = {'long_name': "Area of Grids", 'units': "m2"}
+        grid_ds["grid_area"].attrs = attrs
+        ds = xr.merge([ds, grid_ds])
+        if value_per_area:
+            # Issue a warning if land fraction data is not available at the desired resolution
+            warnings.warn(warning_message, UserWarning)
+            ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+    
+    # Restore the warning filter to its default state
+    warnings.simplefilter('default', UserWarning)
+
+    return ds
+
+def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, cell_size, source=None, time=None, variable_name=None, value_per_area=False, zero_is_value=False):
 
     ds = gridded_poly_2_dataset(polygon_gdf=polygon_gdf, grid_value=grid_value, variable_name=variable_name, cell_size=cell_size)
     variable_name = replace_special_characters(variable_name)
-    # create and add grid area variable
-    gdf = create.create_gridded_polygon(cell_size=1, grid_area="yes")
-    grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
-    attrs = {'long_name': "Area of Grids", 'units': "m2"}
-    grid_ds["grid_area"].attrs = attrs
+
+    ds = add_grid_variables(ds=ds, cell_size=cell_size, variable_name=variable_name, value_per_area=value_per_area)
+    
     # merge with the dataset
-    ds = xr.merge([ds, grid_ds])
-    if value_per_area:
-        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
- 
     variable_name = variable_name if variable_name else grid_value
     ds = add_variable_attributes(ds=ds, variable_name=variable_name, long_name=long_name, 
                                      units=units, source=source, time=time, cell_size=cell_size, value_per_area=value_per_area, zero_is_value=zero_is_value)
@@ -283,17 +320,8 @@ def da_to_ds(da, variable_name, long_name, units, source=None, time=None, cell_s
 
     # add grid area variable
     cell_size = abs(float(ds['lat'].diff('lat').values[0]))
-    
-    # create and add grid area variable
-    gdf = create.create_gridded_polygon(cell_size=1, grid_area="yes")
-    grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
-    attrs = {'long_name': "Area of Grids", 'units': "m2"}
-    grid_ds["grid_area"].attrs = attrs
-    # merge with the dataset
-    ds = xr.merge([ds, grid_ds])
-    if value_per_area:
-        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
-        
+    ds = add_grid_variables(ds=ds, cell_size=cell_size, variable_name=variable_name, value_per_area=value_per_area)
+
     # Add variable metadata
     attrs = {'long_name': long_name, 'units': units}
     if source is not None:
@@ -389,13 +417,17 @@ def dataframe_stats_point(dataframe, fold_field=None, fold_function="sum"):
     return global_summary_stats
 
 
-def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per_area=None):
+def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per_area=None, cell_size=1):
     if variable_name is None and fold_field:
         variable_name = fold_field
     elif variable_name and fold_field:
         variable_name = variable_name
     if value_per_area:
-        global_gridded_stats = (dataset[variable_name] * dataset["grid_area"]).sum().item()
+        cell_size_str = str(cell_size)
+        if cell_size_str == "1" or cell_size_str == "1.0":
+            global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["land_area"]).sum().item()
+        else:
+            global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["grid_area"]).sum().item()
     else:
         global_gridded_stats = (dataset[variable_name]).sum().item()
     return global_gridded_stats
@@ -528,35 +560,123 @@ def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'
     return joined_gdf
 
 
-def poly_intersect(poly_gdf, polygons_gdf, fold_function="sum", fraction=False):
+def convert_xarray_to_gdf(ds, variable_name, cell_size=1):
+    # Extract the data variable as a NumPy array
+    data = ds[variable_name].values
     
+    # Get the coordinates from the dataset
+    lats = ds['lat'].values
+    lons = ds['lon'].values
+    
+    # Create a list to hold the polygons and their corresponding values
+    polygons = []
+    values = []
+    
+    # Loop through the data to create polygons
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            # Define the corners of the polygon centered around (lons[j], lats[i])
+            polygon = Polygon([
+                (lons[j] - cell_size / 2, lats[i] - cell_size / 2),  # Bottom left corner
+                (lons[j] + cell_size / 2, lats[i] - cell_size / 2),  # Bottom right corner
+                (lons[j] + cell_size / 2, lats[i] + cell_size / 2),  # Top right corner
+                (lons[j] - cell_size / 2, lats[i] + cell_size / 2)   # Top left corner
+            ])
+            polygons.append(polygon)
+            values.append(data[i, j])  # Use the corresponding value
+    
+    # Create a GeoDataFrame
+    gdf = gpd.GeoDataFrame({
+        'geometry': polygons,
+        'land_area': values  # Add the values as a column
+    }, crs='EPSG:4326')  # Set the coordinate reference system
+
+    return gdf
+
+
+def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
+
+    # Ignore FutureWarning for other functions
+    warnings.filterwarnings('ignore', category=FutureWarning)
+    # Ensure UserWarning is always shown during this function
+    warnings.simplefilter('always', UserWarning)
+
+    # Save the attributes of the variable
+    attrs = ds[variable_name].attrs
+
+    cell_size_str = str(cell_size)
+    if cell_size_str == "1" or cell_size_str == "1.0":
+        base_directory = os.path.dirname(os.path.abspath(__file__))        
+        land_frac = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        ds = xr.merge([ds, land_frac])
+        # ensure there is no grid values if land fraction is 0
+        land_frac_da = xr.where(ds["land_fraction"] > 0, 1, ds["land_fraction"])
+        ds[variable_name] = ds[variable_name] * land_frac_da
+        # Compute the new fraction using the maximum of ds[variable_name] and ds["land_area"]
+        ds[variable_name] = ds[variable_name] / np.maximum(ds[variable_name], ds["land_area"])
+        # Ensure no values are greater than 1, keeping NaNs unchanged
+        ds[variable_name] = ds[variable_name].where(ds[variable_name].isnull() | (ds[variable_name] <= 1), 1)
+
+    else:
+        # Issue a warning if land fraction data is not available at the desired resolution
+        warnings.warn(warning_message, UserWarning)
+        grid_ds = gridded_poly_2_dataset(polygon_gdf=polygons_gdf, grid_value="grid_area", cell_size=cell_size)
+        attrs = {'long_name': "Area of Grids", 'units': "m2"}
+        grid_ds["grid_area"].attrs = attrs
+        ds = xr.merge([ds, grid_ds])
+        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+    
+    # Reassign the saved attributes back to the variable
+    ds[variable_name].attrs = attrs
+    
+    # Restore the warning filter to its default state
+    warnings.simplefilter('default', UserWarning)
+    return ds
+
+def poly_intersect(poly_gdf, polygons_gdf, variable_name, long_name, units, source, time, cell_size, fold_function="sum", value_per_area=None, zero_is_value=None, fraction=False):
+    
+    warnings.filterwarnings('ignore', category=FutureWarning)
+    warnings.filterwarnings('ignore', category=UserWarning)
+
     # Calculate geometry attributes
     poly_gdf = calculate.calculate_geometry_attributes(input_gdf=poly_gdf, column_name="raw_area")
     polygons_gdf = calculate.calculate_geometry_attributes(input_gdf=polygons_gdf, column_name="grid_area")
-    
     # Perform intersection
     intersections = gpd.overlay(poly_gdf, polygons_gdf, how='intersection')
-    
     # Calculate geometry attributes for intersections
     intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="in_area")
 
-    if fraction:
-        intersections["frac"] = intersections["in_area"] / intersections["grid_area"]
-        intersections = intersections.groupby('uid')['frac'].sum().reset_index()
-    else:
-        if fold_function.lower() == "sum":
-            intersections = intersections.groupby('uid')['in_area'].sum().reset_index()
-        elif fold_function.lower() == "mean":
-            intersections = intersections.groupby('uid')['in_area'].mean().reset_index()
-        elif fold_function.lower() == "max":
-            intersections = intersections.groupby('uid')['in_area'].max().reset_index()
-        elif fold_function.lower() == "min":
-            intersections = intersections.groupby('uid')['in_area'].min().reset_index()
-        elif fold_function.lower() == "std":
-            intersections = intersections.groupby('uid')['in_area'].std().reset_index()
-    
+    if fold_function.lower() == "sum":
+        intersections = intersections.groupby('uid')['in_area'].sum().reset_index()
+    elif fold_function.lower() == "mean":
+        intersections = intersections.groupby('uid')['in_area'].mean().reset_index()
+    elif fold_function.lower() == "max":
+        intersections = intersections.groupby('uid')['in_area'].max().reset_index()
+    elif fold_function.lower() == "min":
+        intersections = intersections.groupby('uid')['in_area'].min().reset_index()
+    elif fold_function.lower() == "std":
+        intersections = intersections.groupby('uid')['in_area'].std().reset_index()
+
     joined_gdf = polygons_gdf.merge(intersections, on='uid', how='left')
-    return joined_gdf
+
+    ds = gridded_poly_2_xarray(
+                polygon_gdf=joined_gdf,
+                grid_value='in_area',
+                long_name=long_name,
+                units=units,
+                source=source,
+                time=time,
+                cell_size=cell_size,
+                variable_name=variable_name,
+                value_per_area=value_per_area,
+                zero_is_value=zero_is_value
+            )
+
+    if fraction:
+        ds = poly_fraction(ds=ds, variable_name=variable_name, cell_size=cell_size, polygons_gdf=polygons_gdf)
+
+    return ds
+
 
 
 def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
