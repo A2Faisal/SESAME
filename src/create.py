@@ -154,7 +154,7 @@ def create_temp_folder(input_path, folder_name="temp"):
 
 
 def create_new_ds(input_ds, tabular_column, country_ds, netcdf_variable, input_df, verbose):
-    country_netcdf = country_ds * input_ds[netcdf_variable]
+    country_netcdf = country_ds * input_ds[netcdf_variable].fillna(0)
     new_ds = xr.Dataset(coords=input_ds.coords)
 
     for var_name in country_netcdf.variables:

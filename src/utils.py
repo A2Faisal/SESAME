@@ -226,6 +226,8 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
         # Merge with the dataset
         ds = xr.merge([ds, land_frac])       
         if value_per_area:
+            # Replace 0 values in 'land_area' with NaN
+            land_frac["land_area"] = land_frac["land_area"].where(land_frac["land_area"] != 0, np.nan)
             ds[variable_name] = ds[variable_name] / land_frac["land_area"]
     else:
         gdf = create.create_gridded_polygon(cell_size=cell_size, grid_area="yes")
@@ -601,6 +603,7 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
     # Ensure UserWarning is always shown during this function
     warnings.simplefilter('always', UserWarning)
 
+    variable_name = replace_special_characters(variable_name)
     # Save the attributes of the variable
     attrs = ds[variable_name].attrs
 
@@ -1082,18 +1085,21 @@ def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value
         x_size = round(float(x_size), 3)
         y_size = round(float(y_size), 3)
 
-        if x_size != y_size or cell_size > x_size:
-            ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
-                           long_name=long_name, units=units, source=source, time=time, cell_size=cell_size, 
-                           value_per_area=value_per_area, zero_is_value=zero_is_value)
-        else:
+        # Define a small tolerance for floating-point comparison
+        tolerance = 1e-6
+
+        # Check if x_size is approximately equal to y_size
+        if abs(x_size - y_size) <= tolerance:
             # re-grid
             array, x_cell_size, y_cell_size = reproject_and_fill(input_raster)
             ds = regrid_array_2_ds(array=array, fold_function=fold_function, variable_name=variable_name, 
                                    long_name=long_name, units=units, source=source, cell_size=cell_size, 
                                    time=time, zero_is_value=zero_is_value, value_per_area=value_per_area, 
                                    verbose=verbose)
-    
+        else:
+            ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
+                           long_name=long_name, units=units, source=source, time=time, cell_size=cell_size, 
+                           value_per_area=value_per_area, zero_is_value=zero_is_value)
     return ds
 
 
