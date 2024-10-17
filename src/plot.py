@@ -241,6 +241,7 @@ def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue'
         
     if y_label:
         plt.ylabel(y_label, fontsize=14)
+    else:
         plt.ylabel(variable2, fontsize=14)
     
     plt.title(plot_title, fontsize=16)

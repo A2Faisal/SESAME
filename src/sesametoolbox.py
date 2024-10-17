@@ -81,12 +81,22 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     cell_size = abs(float(input_ds['lat'].diff('lat').values[0]))
     cell_size_str = str(cell_size)
 
+    if time:
+        # check and convert ISO3 based on occupation or previous control, given a specific year
+        input_df = utils.convert_iso3_by_year(df=input_df, year=time)
+
     # check and print dataframe's iso3 with country fraction dataset
     utils.check_iso3_with_country_ds(input_df, cell_size_str)
   
     base_directory = os.path.dirname(os.path.abspath(__file__))
     if cell_size_str == "1" or cell_size_str == "1.0":
-        country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
+        country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
+        # Remove surrogate variable if land_frac is 0
+        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        grid_ds["land_frac"] = grid_ds["land_frac"].where(grid_ds["land_frac"] == 0, 1)
+        input_ds = input_ds.copy()
+        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0) * grid_ds["land_frac"]
+
     elif cell_size_str == "0.5":
         country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc")) 
     else:
@@ -102,15 +112,22 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
 
     da = xr.DataArray(a, coords={'lat': input_ds['lat'], 'lon': input_ds['lon']}, dims=['lat', 'lon'])
 
-    if verbose:
-        print(f"Global sum of jurisdictional dataset : {input_df[[tabular_column]].sum().item()}")
-        print(f"Global sum of gridded dataset : {da.sum().item()}\n")
+    # # TODO: move verbose to after creating dataset
+    # if verbose:
+    #     print(f"Global sum of jurisdictional dataset : {input_df[[tabular_column]].sum().item()}")
+    #     print(f"Global sum of gridded dataset : {da.sum().item()}\n")
 
     if units == 'value/grid-cell':
         units = 'value m-2'
 
     ds = utils.da_to_ds(da, variable_name, long_name, units, source=source, time=time, cell_size=cell_size,
                         zero_is_value=zero_is_value, value_per_area=value_per_area)
+    
+    if verbose:
+        print(f"Global sum of jurisdictional dataset : {input_df[[tabular_column]].sum().item()}")
+        global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=None, value_per_area=value_per_area, cell_size=cell_size)
+        print(f"Global stats after gridding: {global_gridded_stats:.2f}")
+
     # save the xarray dataset
     if output_directory:
         if netcdf_file_path:

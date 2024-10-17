@@ -1262,11 +1262,11 @@ def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid
     for df in dataframes[1:]:
         merged_df = pd.merge(merged_df, df, on='ISO3')
         
-    if aggregation == 'region':
-        continent_df = pd.merge(merged_df, iso3_continent_df[['ISO-alpha3 code', 'Region 1']], left_on='ISO3', right_on='ISO-alpha3 code')
+    if aggregation:
+        continent_df = pd.merge(merged_df, iso3_continent_df[['ISO-alpha3 code', aggregation]], left_on='ISO3', right_on='ISO-alpha3 code')
         if method_upper in ["SUM", "MEAN", "MAX", "STD"]:
             agg_func = method_upper.lower()  # Method names in DataFrame are lowercase
-            merged_df = continent_df.groupby('Region 1').agg({var: agg_func}).reset_index()
+            merged_df = continent_df.groupby(aggregation).agg({var: agg_func}).reset_index()
         else:
             sys.exit(1)
     if verbose:
@@ -1291,3 +1291,40 @@ def check_iso3_with_country_ds(df, cell_size_str):
     # Check if the list is not empty before printing
     if unmatched_iso3:
         print(f"Country Not Found: {unmatched_iso3}")
+
+
+
+# Define a function to convert ISO3 based on occupation or previous control, given a specific year
+def convert_iso3_by_year(df, year):
+    # Normalize the year format using pandas' to_datetime and extract the year
+    try:
+        normalized_year = pd.to_datetime(year, errors='coerce').year  # Extract year from any date format
+        if pd.isna(normalized_year):
+            raise ValueError(f"Invalid year format: {year}")
+    except Exception as e:
+        raise ValueError(f"Error in parsing the year: {year}. Error: {e}")
+    
+    # Make a copy of the DataFrame to avoid modifying the original
+    df_copy = df.copy()
+
+    # Define a dictionary with ISO3 replacements based on occupation and the year of independence
+    replacements = {
+        'TLS': {'start_year': 2002, 'previous_iso': 'IDN'},  # Timor-Leste -> Indonesia before 2002
+        'XKX': {'start_year': 2008, 'previous_iso': 'SRB'},  # Kosovo -> Serbia before 2008
+        'SSD': {'start_year': 2011, 'previous_iso': 'SDN'},  # South Sudan -> Sudan before 2011
+    }
+
+    # Iterate over the DataFrame rows
+    for index, row in df_copy.iterrows():
+        iso3 = row['ISO3']
+        
+        # Check if the ISO3 is in the replacement dictionary
+        if iso3 in replacements:
+            # If the normalized year is before the country's independence, replace ISO3 with the occupying country's ISO3
+            if normalized_year < replacements[iso3]['start_year']:
+                df_copy.loc[index, 'ISO3'] = replacements[iso3]['previous_iso']
+    
+    # Group by 'ISO3' and sum the values for all numerical columns
+    df_copy = df_copy.groupby('ISO3', as_index=False).sum(numeric_only=True)
+
+    return df_copy

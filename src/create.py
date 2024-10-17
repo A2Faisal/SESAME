@@ -1,5 +1,6 @@
 import os
 import re
+import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Polygon, LineString, Point
 import pyproj
@@ -154,25 +155,53 @@ def create_temp_folder(input_path, folder_name="temp"):
 
 
 def create_new_ds(input_ds, tabular_column, country_ds, netcdf_variable, input_df, verbose):
+
+    # Multiply the country dataset by the input dataset for the specified netCDF variable
+
     country_netcdf = country_ds * input_ds[netcdf_variable].fillna(0)
     new_ds = xr.Dataset(coords=input_ds.coords)
 
+    # Initialize a DataFrame to store results
+    df = pd.DataFrame(columns=["ISO3", "value", "evenly_dis"])
+
     for var_name in country_netcdf.variables:
         if var_name in input_df["ISO3"].values:
-            # Get the corresponding Numeric value from the DataFrame
+            # Get the corresponding numeric value from the DataFrame
             numeric_value = input_df.loc[input_df["ISO3"] == var_name, tabular_column].values[0]
             total_country = country_netcdf[var_name].sum().item()
+
             if numeric_value > 0 and total_country == 0:
+                # If numeric_value is positive and the total country value is zero
                 country_ds_copy = country_ds[var_name].copy()
                 netcdf_da = xr.where(country_ds_copy != 0, 1, country_ds_copy)
                 new_country_netcdf = country_ds_copy * netcdf_da
                 new_country_netcdf = new_country_netcdf.to_dataset()
                 total_country = new_country_netcdf[var_name].sum().item()
+                
+                # Calculate the new dataset value
                 new_ds[var_name] = (new_country_netcdf[var_name] * numeric_value) / total_country
-                if verbose:
-                    print(f"{var_name} evenly distributed.")
+                
+                # Add to the DataFrame
+                total_value = new_ds[var_name].sum().item()
+                new_row = pd.DataFrame({"ISO3": [var_name], "value": [total_value], "evenly_dis": [True]})
+                df = pd.concat([df, new_row], ignore_index=True)
             else:
-                # Dasymmetric equation
+                # For cases where a dasymmetric equation is used
                 new_ds[var_name] = (country_netcdf[var_name] * numeric_value) / total_country
+                
+                # Add to the DataFrame
+                total_value = new_ds[var_name].sum().item()
+                new_row = pd.DataFrame({"ISO3": [var_name], "value": [total_value], "evenly_dis": [False]})
+                df = pd.concat([df, new_row], ignore_index=True)
+
+    # Verbose output for evenly distributed countries
+    if verbose:
+        evenly_df = df[df["evenly_dis"] == True]  # Corrected filtering syntax
+        if not evenly_df.empty:  # Check if there are any evenly distributed countries
+            print(f"List of evenly distributed countries: {evenly_df['ISO3'].unique()}")
+            percentage = (evenly_df["value"].sum() * 100) / df["value"].sum()
+            print(f"Evenly distributed country coverage: {percentage:.2f}%")
+
     return new_ds
+
 
