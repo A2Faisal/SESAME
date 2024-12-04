@@ -289,6 +289,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
         if verbose:
             global_summary_stats = utils.dataframe_stats_poly(dataframe=poly_gdf, fold_function=fold_function)
             print(f"Global stats before gridding : {global_summary_stats:.2f} km2.")
+            variable_name = utils.replace_special_characters(variable_name)
             global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=grid_value,
                                                               value_per_area=fraction, cell_size=cell_size) * 1e-6
             print(f"Global stats after gridding: {global_gridded_stats:.2f} km2.")

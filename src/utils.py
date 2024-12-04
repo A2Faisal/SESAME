@@ -613,7 +613,7 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
         land_frac = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
         ds = xr.merge([ds, land_frac])
         # ensure there is no grid values if land fraction is 0
-        land_frac_da = xr.where(ds["land_fraction"] > 0, 1, ds["land_fraction"])
+        land_frac_da = xr.where(ds["land_frac"] > 0, 1, ds["land_frac"])
         ds[variable_name] = ds[variable_name] * land_frac_da
         # Compute the new fraction using the maximum of ds[variable_name] and ds["land_area"]
         ds[variable_name] = ds[variable_name] / np.maximum(ds[variable_name], ds["land_area"])

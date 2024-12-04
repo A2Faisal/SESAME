@@ -537,13 +537,20 @@ def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', colo
         norm=norm,
     )
 
-    ax.coastlines(resolution='110m', linewidth=1)
+    ax.coastlines(resolution='110m', color='gray', linewidth=1)
     ax.add_feature(cfeature.LAND, color='white')
     ax.set_title(title)
+    # Adjust the elliptical boundary line width
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.5)
 
     # Create a custom colorbar with a triangular arrow at the end
     cax = fig.add_axes([0.27, 0.03, 0.5, 0.05])  # Adjust these values to position the colorbar
-    cb = ColorbarBase(cax, cmap=cmap_discrete, norm=Normalize(vmin=color_min, vmax=color_max), 
+    if color_min < 0:
+        cb = ColorbarBase(cax, cmap=cmap_discrete, norm=Normalize(vmin=color_min, vmax=color_max), 
+                      orientation='horizontal', extend='both')
+    else:
+        cb = ColorbarBase(cax, cmap=cmap_discrete, norm=Normalize(vmin=color_min, vmax=color_max), 
                       orientation='horizontal', extend='max')
     cb.set_label(label)
     
