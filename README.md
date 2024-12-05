@@ -9,12 +9,15 @@ Data on human and non-human systems are typically archived in very different way
 ## Installation Instructions
 ### If you want to use conda to manage your  environment
 conda create -n sesame_env
+
 conda activate sesame_env
+
 conda install pip
-pip install sesame
+
+pip install opensesame
 
 ### Then at the top of your python script,
-import sesame as sm
+import opensesame as sm
 
 
 ## Goals
