@@ -7,13 +7,13 @@ Data on human and non-human systems are typically archived in very different way
 [Link to readthedocs.io]
 
 ## Installation Instructions
-# If you want to use conda to manage your  environment
+### If you want to use conda to manage your  environment
 conda create -n sesame_env
 conda activate sesame_env
 conda install pip
 pip install sesame
 
-# Then at the top of your python script,
+### Then at the top of your python script,
 import sesame as sm
 
 
