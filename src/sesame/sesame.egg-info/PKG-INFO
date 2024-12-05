@@ -1,0 +1,55 @@
+Metadata-Version: 2.1
+Name: sesame
+Version: 0.1.0
+Summary: A package for Sesame Toolbox utilities
+Author-email: Abdullah Al Faisal <abdullah-al.faisal@mail.mcgill.ca>, Maxwell Kaye <maxwell.kaye@mail.mcgill.ca>
+License: MIT License
+        
+        Copyright (c) 2024 Abdullah Al Faisal, Maxwell Kaye
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Project-URL: Homepage, https://github.com/A2Faisal/SESAME
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: numpy==2.0.1
+Requires-Dist: pandas==2.2.2
+Requires-Dist: xarray==2024.6.0
+
+# SESAME Project
+
+## About
+Data on human and non-human systems are typically archived in very different ways, in different places. The SESAME project aims to bring key human-Earth datasets into the same, spatially-gridded format to accelerate discovery and aid modeling efforts.
+
+## Goals
+- Bring human and non-human system datasets into a unified spatially-gridded format.
+- Accelerate data discovery and facilitate modeling efforts through standardized data structures.
+- Foster interdisciplinary collaboration and research by providing accessible and integrated datasets.
+
+## Software Package
+SESAME Software package is dependent on multiple python files. Users are requested to download the files from src folder. Software documentation will be available soon.
+
+## Human-Earth Atlas
+Datasets can be downloaded in NetCDF format from {link}. Detailed dataset documentation file can be found in [Google Spreadsheet](https://docs.google.com/spreadsheets/d/17rn570hyfLm0OsSmbTxHcVGPS4Vy27EpWAI02Rqu-WQ/edit?usp=sharing). 
+
+## Contact
+For questions or inquiries about the SESAME project, please contact [abdullah-al.faisal@mail.mcgill.ca](mailto:abdullah-al.faisal@mail.mcgill.ca).

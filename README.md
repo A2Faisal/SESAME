@@ -3,6 +3,20 @@
 ## About
 Data on human and non-human systems are typically archived in very different ways, in different places. The SESAME project aims to bring key human-Earth datasets into the same, spatially-gridded format to accelerate discovery and aid modeling efforts.
 
+## Documentation
+[Link to readthedocs.io]
+
+## Installation Instructions
+# If you want to use conda to manage your  environment
+conda create -n sesame_env
+conda activate sesame_env
+conda install pip
+pip install sesame
+
+# Then at the top of your python script,
+import sesame as sm
+
+
 ## Goals
 - Bring human and non-human system datasets into a unified spatially-gridded format.
 - Accelerate data discovery and facilitate modeling efforts through standardized data structures.
@@ -16,3 +30,5 @@ Datasets can be downloaded in NetCDF format from {link}. Detailed dataset docume
 
 ## Contact
 For questions or inquiries about the SESAME project, please contact [abdullah-al.faisal@mail.mcgill.ca](mailto:abdullah-al.faisal@mail.mcgill.ca).
+
+
