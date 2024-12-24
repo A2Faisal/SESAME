@@ -6,10 +6,15 @@ from shapely.geometry import Polygon, LineString, Point
 import pyproj
 import numpy as np
 import xarray as xr
-import warnings
-from . import calculate
-from . import utils
 
+
+# from . import calculate
+# from . import utils
+
+import calculate
+import utils
+
+import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
 

@@ -15,11 +15,15 @@ from rasterio.transform import from_origin
 from pyproj import CRS, Transformer
 from shapely.geometry import box
 
-import warnings
-from . import create
-from . import calculate
-from . import get
+# from . import create
+# from . import calculate
+# from . import get
 
+import create
+import calculate
+import get
+
+import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -100,7 +104,7 @@ def adjust_points(points_gdf, polygons_gdf, x_offset=0.0001, y_offset=0.0001):
     return points_gdf
 
 
-def add_variable_attributes(ds, variable_name, long_name, units, source=None, time=None, cell_size=1, value_per_area=False, zero_is_value=False):
+def add_variable_attributes(ds, variable_name, long_name, units, source=None, time=None, zero_is_value=False):
     """
     Adds attributes to a variable in an xarray Dataset.
     
@@ -222,13 +226,14 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
     if cell_size_str == "1" or cell_size_str == "1.0":
         # Add grid area variable
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        land_frac = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
         # Merge with the dataset
-        ds = xr.merge([ds, land_frac])       
+        ds = xr.merge([ds, grid_ds])       
         if value_per_area:
-            # Replace 0 values in 'land_area' with NaN
-            land_frac["land_area"] = land_frac["land_area"].where(land_frac["land_area"] != 0, np.nan)
-            ds[variable_name] = ds[variable_name] / land_frac["land_area"]
+            # # Replace 0 values in 'land_area' with NaN
+            # land_frac["land_area"] = land_frac["land_area"].where(land_frac["land_area"] != 0, np.nan)
+            # ds[variable_name] = ds[variable_name] / land_frac["land_area"]
+            ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     else:
         gdf = create.create_gridded_polygon(cell_size=cell_size, grid_area="yes")
         grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
@@ -255,7 +260,7 @@ def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, cell_size, 
     # merge with the dataset
     variable_name = variable_name if variable_name else grid_value
     ds = add_variable_attributes(ds=ds, variable_name=variable_name, long_name=long_name, 
-                                     units=units, source=source, time=time, cell_size=cell_size, value_per_area=value_per_area, zero_is_value=zero_is_value)
+                                     units=units, source=source, time=time, zero_is_value=zero_is_value)
 
     return ds
 
@@ -425,14 +430,15 @@ def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per
     elif variable_name and fold_field:
         variable_name = variable_name
     if value_per_area:
-        cell_size_str = str(cell_size)
-        if cell_size_str == "1" or cell_size_str == "1.0":
-            global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["land_area"]).sum().item()
-        else:
-            global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["grid_area"]).sum().item()
+        # cell_size_str = str(cell_size)
+        # if cell_size_str == "1" or cell_size_str == "1.0":
+        #     global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["land_area"]).sum().item()
+        # else:
+        global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["grid_area"]).sum().item()
     else:
         global_gridded_stats = (dataset[variable_name]).sum().item()
     return global_gridded_stats
+
 
 def save_to_nc(ds, output_directory=None, output_filename=None, base_filename=None):
     if output_directory != None:
@@ -523,7 +529,7 @@ def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'
     polygons_gdf = calculate.calculate_geometry_attributes(input_gdf=polygons_gdf, column_name="grid_area")
     
     # Perform intersection
-    intersections = gpd.overlay(lines_gdf, polygons_gdf, how='intersection')
+    intersections = gpd.overlay(lines_gdf, polygons_gdf, how='intersection', keep_geom_type=True)
     
     # Calculate geometry attributes for intersections
     intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="length_m")
@@ -590,7 +596,7 @@ def convert_xarray_to_gdf(ds, variable_name, cell_size=1):
     # Create a GeoDataFrame
     gdf = gpd.GeoDataFrame({
         'geometry': polygons,
-        'land_area': values  # Add the values as a column
+        'grid_area': values  # Add the values as a column
     }, crs='EPSG:4326')  # Set the coordinate reference system
 
     return gdf
@@ -610,15 +616,16 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
     cell_size_str = str(cell_size)
     if cell_size_str == "1" or cell_size_str == "1.0":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        land_frac = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
-        ds = xr.merge([ds, land_frac])
-        # ensure there is no grid values if land fraction is 0
-        land_frac_da = xr.where(ds["land_frac"] > 0, 1, ds["land_frac"])
-        ds[variable_name] = ds[variable_name] * land_frac_da
-        # Compute the new fraction using the maximum of ds[variable_name] and ds["land_area"]
-        ds[variable_name] = ds[variable_name] / np.maximum(ds[variable_name], ds["land_area"])
-        # Ensure no values are greater than 1, keeping NaNs unchanged
-        ds[variable_name] = ds[variable_name].where(ds[variable_name].isnull() | (ds[variable_name] <= 1), 1)
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        ds = xr.merge([ds, grid_ds])
+        # # ensure there is no grid values if land fraction is 0
+        # land_frac_da = xr.where(ds["land_frac"] > 0, 1, ds["land_frac"])
+        # ds[variable_name] = ds[variable_name] * land_frac_da
+        # # Compute the new fraction using the maximum of ds[variable_name] and ds["land_area"]
+        # ds[variable_name] = ds[variable_name] / np.maximum(ds[variable_name], ds["land_area"])
+        # # Ensure no values are greater than 1, keeping NaNs unchanged
+        # ds[variable_name] = ds[variable_name].where(ds[variable_name].isnull() | (ds[variable_name] <= 1), 1)
+        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
 
     else:
         # Issue a warning if land fraction data is not available at the desired resolution
@@ -1148,24 +1155,31 @@ def delete_temporary_folder(folder_path):
     except Exception as e:
         print(f"Error deleting the folder: {e}")
 
-def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid_area=None, cell_size=1, aggregation=None, method='sum', verbose=False):
 
+def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, grid_area=False, cell_size=1, aggregation=None, method='sum', verbose=False):
     base_directory = os.path.dirname(os.path.abspath(__file__))
 
+    # Load dataset from NetCDF file if provided
     if input_netcdf_path:
         ds = xr.load_dataset(input_netcdf_path)
 
     if not isinstance(ds, xr.Dataset):
-        raise ValueError("Please provide either netcdf or xarray dataset.")
-    
-    # Check if a specific variable is provided, otherwise consider all variables in the dataset
-    if variable is not None:
-        variables_list = [variable]
+        raise ValueError("Please provide either a NetCDF file path or an xarray Dataset.")
+
+    # Determine variables to process
+    exclude_vars = ["time", "lat", "lon", "land_frac", "grid_area", "land_area"]
+    if variables is not None:
+        if isinstance(variables, str):
+            variables_list = [variables]
+        elif isinstance(variables, list):
+            variables_list = variables
+        else:
+            raise ValueError("variables should be a string or a list of strings.")
     else:
-        # Get the list of variables except the specified ones
-        exclude_vars = ["time", "lat", "lon", "grid_area", "grid_area_1deg"]
-        variables_list = [var for var in ds.variables if var not in exclude_vars]
-        print(f"List of variables in the dataset: {variables_list}")
+        variables_list = [var for var in ds.data_vars if var not in exclude_vars]
+
+    if verbose:
+        print(f"List of variables to process: {variables_list}")
 
     # Initialize an empty list to store DataFrames
     dataframes = []
@@ -1174,12 +1188,10 @@ def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid
     try:
         iso3_continent_df = pd.read_csv(os.path.join(base_directory, "un_geoscheme.csv"), encoding='utf-8')
     except UnicodeDecodeError:
-        # Try a different encoding if 'utf-8' fails
         iso3_continent_df = pd.read_csv(os.path.join(base_directory, "un_geoscheme.csv"), encoding='latin1')
 
     # Loop through each variable in the dataset
-    for var in variables_list:   
-        # Select the country fraction data based on cell size
+    for var in variables_list:
         try:
             cell_size_str = str(cell_size)
             if cell_size_str == "1" or cell_size_str == "1.0":
@@ -1187,57 +1199,62 @@ def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid
             elif cell_size_str == "0.5":
                 cntry_ds = xr.load_dataset(os.path.join(base_directory, "Country_Fraction.0_5deg.2000-2023.nc"))
         except FileNotFoundError as e:
-            print(f" Error while reading file {e} ")
-        
-        # Check if 'time' is a dimension in the variable
+            print(f"Error while reading file {e}")
+
+        # Handle the time dimension
         if 'time' in ds[var].dims:
             if time is not None:
                 cntry_ds = cntry_ds.sel(time=time, method='nearest')
-                ds_var = ds[var].sel(time=time, method='nearest')
+                ds_var = ds[var].sel(time=time, method='nearest').drop_vars("time")
             else:
                 latest_time = ds[var]['time'][-1].values
+                if verbose:
+                    print(f"Time not specified. Selecting the latest available time: {latest_time}")
                 cntry_ds = cntry_ds.sel(time=latest_time, method='nearest')
-                ds_var = ds[var].sel(time=latest_time, method='nearest')
+                ds_var = ds[var].sel(time=latest_time, method='nearest').drop_vars("time")
         else:
-            cntry_ds = cntry_ds.sel(time='2020-01-01')
+            cntry_ds = cntry_ds.sel(time='2020-01-01').drop_vars("time")
             ds_var = ds[var]
 
-        if grid_area is not None and grid_area.upper() == 'YES':
-            gdf = create.create_gridded_polygon(cell_size=1, grid_area="yes")
-            grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
-            # Multiply the variable by grid area if specified
-            ds_var = ds_var * grid_ds["grid_area"]
-            print(f"Generating the tabular data for: {var}")
-        
-        if verbose:
-            if method.upper() =="SUM":
-                print(f"Global gridded {method}: {ds_var.sum().item()}")
-            elif method.upper() =="MEAN":
-                print(f"Global gridded {method}: {ds_var.mean().item()}")
-            elif method.upper() == "MAX":
-                print(f"Global gridded {method}: {ds_var.max().item()}")
-            elif method.upper() == "MIN":
-                print(f"Global gridded {method}: {ds_var.min().item()}")
-            elif method.upper() == "STD":
-                print(f"Global gridded {method}: {ds_var.std().item()}")
+        # Handle grid_area
+        if grid_area:
+            if "grid_area" in ds.data_vars:
+                grid_ds = ds["grid_area"]
             else:
-                sys.exit(1)
-        
+                if verbose:
+                    print("grid_area not found in the dataset. Creating a new one.")
+                gdf = create.create_gridded_polygon(cell_size=cell_size, grid_area="yes")
+                grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
+
+            ds_var = ds_var * grid_ds
+
+        # Verbose global gridded summary
+        if verbose:
+            global_methods = {
+                "SUM": ds_var.sum().item(),
+                "MEAN": ds_var.mean().item(),
+                "MAX": ds_var.max().item(),
+                "MIN": ds_var.min().item(),
+                "STD": ds_var.std().item(),
+            }
+            if method.upper() in global_methods:
+                print(f"Global gridded stats for {var}: {global_methods[method.upper()]:.2f}")
+
+        # Multiply by country fraction
         ds_var = ds_var * cntry_ds
-#         ds_var = ds_var.drop_vars('time')
-        
-        if method.upper() =="SUM":
-            data = ds_var.sum()
-        elif method.upper() =="MEAN":
-            data = ds_var.mean()
-        elif method.upper() == "MAX":
-            data = ds_var.max()
-        elif method.upper() == "MIN":
-            data = ds_var.min()
-        elif method.upper() == "STD":
-            data = ds_var.std()
+
+        # Apply aggregation method
+        aggregation_methods = {
+            "SUM": ds_var.sum(),
+            "MEAN": ds_var.mean(),
+            "MAX": ds_var.max(),
+            "MIN": ds_var.min(),
+            "STD": ds_var.std(),
+        }
+        if method.upper() in aggregation_methods:
+            data = aggregation_methods[method.upper()]
         else:
-            sys.exit(1)
+            raise ValueError(f"Unsupported method: {method}")
 
         # Extract variable names and values
         variable_names = list(data.data_vars.keys())
@@ -1245,32 +1262,34 @@ def grid_2_table(input_netcdf_path=None, ds=None, variable=None, time=None, grid
 
         # Create a DataFrame from variable names and values
         df = pd.DataFrame({'ISO3': variable_names, var: values})
+
+        # Verbose global tabular summary for cross-checking
+        if verbose:
+            if method.lower() == 'sum':
+                tabular_stat = df[var].sum()
+            elif method.lower() == 'mean':
+                tabular_stat = df[var].mean()
+            elif method.lower() == 'min':
+                tabular_stat = df[var].min()   
+            elif method.lower() == 'max':
+                tabular_stat = df[var].max()       
+            elif method.lower() == 'std':
+                tabular_stat = df[var].std() 
+            else:
+                raise ValueError(f"Unsupported fold function: {method}")
+          
+        print(f"Global tabular stats for {var}: {tabular_stat:.2f}")
+
         dataframes.append(df)
 
-    # If a specific time is provided, add a 'Year' column to the resulting DataFrame
-    if time is not None:
-        year = time[:4]
-        merged_df = dataframes[0]  # Start with the first DataFrame
-        merged_df = pd.concat([merged_df['ISO3'],
-                               pd.DataFrame({'Year': year}, index=merged_df.index),
-                               merged_df.drop(columns=['ISO3'])], axis=1)
-    else:
-        merged_df = dataframes[0]  # Start with the first DataFrame
-    
-    method_upper = method.upper()
-    # Merge DataFrames based on 'ISO3' column
-    for df in dataframes[1:]:
-        merged_df = pd.merge(merged_df, df, on='ISO3')
-        
+    # Merge DataFrames and add 'Year' column if time is specified
+    merged_df = pd.concat(dataframes, axis=0)
+
+    # Perform aggregation if specified
     if aggregation:
-        continent_df = pd.merge(merged_df, iso3_continent_df[['ISO-alpha3 code', aggregation]], left_on='ISO3', right_on='ISO-alpha3 code')
-        if method_upper in ["SUM", "MEAN", "MAX", "STD"]:
-            agg_func = method_upper.lower()  # Method names in DataFrame are lowercase
-            merged_df = continent_df.groupby(aggregation).agg({var: agg_func}).reset_index()
-        else:
-            sys.exit(1)
-    if verbose:
-        print(f"Global tabular {method_upper}: {getattr(merged_df[var], method)()}")
+        continent_df = pd.merge(merged_df, iso3_continent_df[["ISO-alpha3 code", aggregation]],
+                                left_on="ISO3", right_on="ISO-alpha3 code")
+        merged_df = continent_df.groupby(aggregation).agg({var: method.lower() for var in variables_list}).reset_index()
 
     return merged_df
 

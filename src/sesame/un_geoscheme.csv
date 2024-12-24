@@ -1,4 +1,4 @@
-Region 0,Region 1,Region 2,Region 3,M49 code,ISO-alpha3 code
+region_0,region_1,region_2,region_3,M49 code,ISO-alpha3 code
 Africa,Northern Africa,Northern Africa,Algeria,12,DZA
 Africa,Northern Africa,Northern Africa,Egypt,818,EGY
 Africa,Northern Africa,Northern Africa,Libya,434,LBY
@@ -19,7 +19,7 @@ Africa,Sub-Saharan Africa,Eastern Africa,Malawi,454,MWI
 Africa,Sub-Saharan Africa,Eastern Africa,Mauritius,480,MUS
 Africa,Sub-Saharan Africa,Eastern Africa,Mayotte,175,MYT
 Africa,Sub-Saharan Africa,Eastern Africa,Mozambique,508,MOZ
-Africa,Sub-Saharan Africa,Eastern Africa,Réunion,638,REU
+Africa,Sub-Saharan Africa,Eastern Africa,RÔøΩunion,638,REU
 Africa,Sub-Saharan Africa,Eastern Africa,Rwanda,646,RWA
 Africa,Sub-Saharan Africa,Eastern Africa,Seychelles,690,SYC
 Africa,Sub-Saharan Africa,Eastern Africa,Somalia,706,SOM
@@ -45,7 +45,7 @@ Africa,Sub-Saharan Africa,Southern Africa,South Africa,710,ZAF
 Africa,Sub-Saharan Africa,Western Africa,Benin,204,BEN
 Africa,Sub-Saharan Africa,Western Africa,Burkina Faso,854,BFA
 Africa,Sub-Saharan Africa,Western Africa,Cabo Verde,132,CPV
-Africa,Sub-Saharan Africa,Western Africa,Côte d’Ivoire,384,CIV
+Africa,Sub-Saharan Africa,Western Africa,CÔøΩte dÔøΩIvoire,384,CIV
 Africa,Sub-Saharan Africa,Western Africa,Gambia,270,GMB
 Africa,Sub-Saharan Africa,Western Africa,Ghana,288,GHA
 Africa,Sub-Saharan Africa,Western Africa,Guinea,324,GIN
@@ -68,7 +68,7 @@ Americas,Latin America and the Caribbean,Caribbean,"Bonaire, Sint Eustatius and 
 Americas,Latin America and the Caribbean,Caribbean,British Virgin Islands,92,VGB
 Americas,Latin America and the Caribbean,Caribbean,Cayman Islands,136,CYM
 Americas,Latin America and the Caribbean,Caribbean,Cuba,192,CUB
-Americas,Latin America and the Caribbean,Caribbean,Curaçao,531,CUW
+Americas,Latin America and the Caribbean,Caribbean,CuraÔøΩao,531,CUW
 Americas,Latin America and the Caribbean,Caribbean,Dominica,212,DMA
 Americas,Latin America and the Caribbean,Caribbean,Dominican Republic,214,DOM
 Americas,Latin America and the Caribbean,Caribbean,Grenada,308,GRD
@@ -78,7 +78,7 @@ Americas,Latin America and the Caribbean,Caribbean,Jamaica,388,JAM
 Americas,Latin America and the Caribbean,Caribbean,Martinique,474,MTQ
 Americas,Latin America and the Caribbean,Caribbean,Montserrat,500,MSR
 Americas,Latin America and the Caribbean,Caribbean,Puerto Rico,630,PRI
-Americas,Latin America and the Caribbean,Caribbean,Saint Barthélemy,652,BLM
+Americas,Latin America and the Caribbean,Caribbean,Saint BarthÔøΩlemy,652,BLM
 Americas,Latin America and the Caribbean,Caribbean,Saint Kitts and Nevis,659,KNA
 Americas,Latin America and the Caribbean,Caribbean,Saint Lucia,662,LCA
 Americas,Latin America and the Caribbean,Caribbean,Saint Martin (French Part),663,MAF
@@ -165,7 +165,7 @@ Asia,Asia,Western Asia,Qatar,634,QAT
 Asia,Asia,Western Asia,Saudi Arabia,682,SAU
 Asia,Asia,Western Asia,State of Palestine,275,PSE
 Asia,Asia,Western Asia,Syrian Arab Republic,760,SYR
-Asia,Asia,Western Asia,Türkiye,792,TUR
+Asia,Asia,Western Asia,TÔøΩrkiye,792,TUR
 Asia,Asia,Western Asia,United Arab Emirates,784,ARE
 Asia,Asia,Western Asia,Yemen,887,YEM
 Europe,Europe,Eastern Europe,Belarus,112,BLR
@@ -178,7 +178,7 @@ Europe,Europe,Eastern Europe,Romania,642,ROU
 Europe,Europe,Eastern Europe,Russian Federation,643,RUS
 Europe,Europe,Eastern Europe,Slovakia,703,SVK
 Europe,Europe,Eastern Europe,Ukraine,804,UKR
-Europe,Europe,Northern Europe,Åland Islands,248,ALA
+Europe,Europe,Northern Europe,ÔøΩland Islands,248,ALA
 Europe,Europe,Northern Europe,Denmark,208,DNK
 Europe,Europe,Northern Europe,Estonia,233,EST
 Europe,Europe,Northern Europe,Faroe Islands,234,FRO

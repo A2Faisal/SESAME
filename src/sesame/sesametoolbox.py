@@ -9,15 +9,21 @@ import xarray as xr
 import json
 
 # import local libraries
-from . import create
-from . import utils
-from . import calculate
-from . import plot
-from . import get
+# from . import create
+# from . import utils
+# from . import calculate
+# from . import plot
+# from . import get
+
+import create
+import utils
+import calculate
+import plot
+import get
 
 def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_file_path=None, input_ds=None,
                  input_df=None, variable_name=None, long_name=None, units="value/grid-cell", source=None,
-                 time=None, output_directory=None, output_filename=None, zero_is_value=None, value_per_area=None, verbose=False):
+                 time=None, output_directory=None, output_filename=None, zero_is_value=None, value_per_grid=None, verbose=False):
     """
     Convert tabular data to a gridded dataset by spatially distributing values based on a NetCDF variable and a tabular column.
 
@@ -93,10 +99,12 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     if cell_size_str == "1" or cell_size_str == "1.0":
         country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
         # Remove surrogate variable if land_frac is 0
-        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
-        grid_ds["land_frac"] = grid_ds["land_frac"].where(grid_ds["land_frac"] == 0, 1)
+        # grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        # grid_ds["land_frac"] = grid_ds["land_frac"].where(grid_ds["land_frac"] == 0, 1)
+        # input_ds = input_ds.copy()
+        # input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0) * grid_ds["land_frac"]
         input_ds = input_ds.copy()
-        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0) * grid_ds["land_frac"]
+        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
 
     elif cell_size_str == "0.5":
         country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc")) 
@@ -122,11 +130,11 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         units = 'value m-2'
 
     ds = utils.da_to_ds(da, variable_name, long_name, units, source=source, time=time, cell_size=cell_size,
-                        zero_is_value=zero_is_value, value_per_area=value_per_area)
+                        zero_is_value=zero_is_value, value_per_area=value_per_grid)
     
     if verbose:
         print(f"Global sum of jurisdictional dataset : {input_df[[tabular_column]].sum().item()}")
-        global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=None, value_per_area=value_per_area, cell_size=cell_size)
+        global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=None, value_per_area=value_per_grid, cell_size=cell_size)
         print(f"Global stats after gridding: {global_gridded_stats:.2f}")
 
     # save the xarray dataset
@@ -140,7 +148,7 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
 
 
 def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, cell_size=1, netcdf_variable=None, output_directory=None, 
-                 output_filename=None, zero_is_value=False, value_per_area=False, verbose=False):  
+                 output_filename=None, zero_is_value=False, value_per_grid=False, verbose=False):  
 
     """
     Converts raster data (TIFF or netCDF) into a re-gridded xarray dataset.
@@ -171,7 +179,7 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
         Filename for the output netCDF file. Default is None.
     zero_is_value : bool, optional
         Whether to treat zero values as valid data rather than as no-data. Default is False.
-    value_per_area : bool, optional
+    value_per_grid : bool, optional
         Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
     verbose : bool, optional
         If True, prints the global sum of values before and after re-gridding. Default is False.
@@ -196,7 +204,7 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
         # Convert TIFF data to a re-gridded dataset
         ds = utils.tif_2_ds(input_raster=raster_path, fold_function=fold_function, variable_name=variable_name, 
                       long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, 
-                      zero_is_value=zero_is_value, value_per_area=value_per_area, verbose=verbose)
+                      zero_is_value=zero_is_value, value_per_area=value_per_grid, verbose=verbose)
     
     elif file_extension == ".nc" or file_extension == ".nc4":
         # Convert netCDF to TIFF
@@ -205,7 +213,7 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
         # Convert netCDF data to a re-gridded dataset
         ds = utils.tif_2_ds(input_raster=netcdf_tif_path, fold_function=fold_function, variable_name=variable_name, 
                       long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, 
-                      zero_is_value=zero_is_value, value_per_area=value_per_area, verbose=verbose)
+                      zero_is_value=zero_is_value, value_per_area=value_per_grid, verbose=verbose)
     else:
         # Print an error message for unrecognized file types
         print("Error: File type is not recognized. File type should be either TIFF or netCDF file.")
@@ -221,7 +229,7 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
 
 def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/grid-cell", source=None, time=None, 
                  cell_size=1, attr_field=None, shapefile_path=None, fraction=False, fold_function="sum", output_directory=None, 
-                 output_filename=None, value_per_area=False, zero_is_value=False, verbose=False):
+                 output_filename=None, value_per_grid=False, zero_is_value=False, verbose=False):
 
     """
     Converts polygon data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
@@ -263,7 +271,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
         Directory where the output netCDF file will be saved. Default is None.
     output_filename : str, optional
         Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
-    value_per_area : bool, optional
+    value_per_grid : bool, optional
         If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
     zero_is_value : bool, optional
         If True, treats zero values as valid data rather than as no-data. Default is False.
@@ -309,7 +317,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
             # Determine fold_field, long_name, and units for the current iteration
             grid_value = "frac" if fraction else "in_area"
             current_long_name = utils.reverse_replace_special_characters(filter_var)
-            current_units = utils.determine_units_poly(units, value_per_area, fraction)
+            current_units = utils.determine_units_poly(units, value_per_grid, fraction)
 
             # Convert GeoDataFrame to xarray dataset
             ds_var = utils.poly_intersect(poly_gdf=filtered_gdf,
@@ -322,7 +330,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
                                             cell_size=cell_size,
                                             fold_function=fold_function, 
                                             fraction=fraction,
-                                            value_per_area=value_per_area,
+                                            value_per_area=value_per_grid,
                                             zero_is_value=zero_is_value)
 
             # Print or process verbose information
@@ -345,7 +353,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
         # Determine fold_field, long_name, and units
         grid_value = "frac" if fraction else "in_area"
         long_name = utils.determine_long_name_poly(variable_name, long_name, fold_function)
-        units = utils.determine_units_poly(units, value_per_area, fraction)
+        units = utils.determine_units_poly(units, value_per_grid, fraction)
         
         # Convert GeoDataFrame to xarray dataset
         ds = utils.poly_intersect(poly_gdf=poly_gdf,
@@ -358,7 +366,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
                                         cell_size=cell_size,
                                         fold_function=fold_function, 
                                         fraction=fraction,
-                                        value_per_area=value_per_area,
+                                        value_per_area=value_per_grid,
                                         zero_is_value=zero_is_value)
 
         if verbose:
@@ -366,7 +374,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
             print(f"Global stats before gridding : {global_summary_stats:.2f} km2.")
             variable_name = utils.replace_special_characters(variable_name)
             global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=grid_value,
-                                                              value_per_area=fraction, cell_size=cell_size) * 1e-6
+                                                              value_per_area=value_per_grid, cell_size=cell_size) * 1e-6
             print(f"Global stats after gridding: {global_gridded_stats:.2f} km2.")
     
     # save the xarray dataset
@@ -380,7 +388,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
     
 def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter/grid-cell", source=None, time=None, 
                  cell_size=1, fold_field=None, fold_function="sum", attr_field=None, shapefile_path=None, 
-                 output_directory=None, output_filename=None, value_per_area=False, zero_is_value=False, verbose=False):
+                 output_directory=None, output_filename=None, value_per_grid=False, zero_is_value=False, verbose=False):
     
     """
     Converts line data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
@@ -423,7 +431,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
         Directory where the output netCDF file will be saved. Default is None.
     output_filename : str, optional
         Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
-    value_per_area : bool, optional
+    value_per_grid : bool, optional
         If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
     zero_is_value : bool, optional
         If True, treats zero values as valid data rather than as no-data. Default is False.
@@ -467,7 +475,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
             # Determine fold_field, long_name, and units for the current iteration
             current_fold_field = fold_field or f"length_{fold_function.lower()}"
             current_long_name = utils.reverse_replace_special_characters(filter_var)
-            current_units = utils.determine_units_line(units, value_per_area)
+            current_units = utils.determine_units_line(units, value_per_grid)
 
             # Convert joined GeoDataFrame to xarray dataset
             ds_var = utils.gridded_poly_2_xarray(
@@ -479,7 +487,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
                 time=time,
                 cell_size=cell_size,
                 variable_name=filter_var,
-                value_per_area=value_per_area,
+                value_per_area=value_per_grid,
                 zero_is_value=zero_is_value
             )
 
@@ -488,7 +496,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
                 global_summary_stats = utils.dataframe_stats_line(dataframe=filtered_gdf, fold_field=fold_field, fold_function=fold_function)
                 print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km.")
                 var_name = utils.replace_special_characters(filter_var)
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_area, cell_size=cell_size) * 1e-3
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_grid, cell_size=cell_size) * 1e-3
                 print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km.")
 
             print("\n")
@@ -503,7 +511,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
         # Determine fold_field, long_name, and units
         fold_field = "length_m"
         long_name = utils.determine_long_name_line(long_name, fold_field, variable_name)
-        units = utils.determine_units_line(units, value_per_area)
+        units = utils.determine_units_line(units, value_per_grid)
         ds = utils.gridded_poly_2_xarray(
             polygon_gdf=joined_gdf,
             grid_value=fold_field,
@@ -513,14 +521,14 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
             time=time,
             cell_size=cell_size,
             variable_name=variable_name,
-            value_per_area=value_per_area,
+            value_per_area=value_per_grid,
             zero_is_value=zero_is_value
         )
         
         if verbose:
             global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, fold_field=fold_field, fold_function=fold_function)
             print(f"Global stats before gridding : {global_summary_stats:.2f} km.")
-            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_area, cell_size=cell_size) * 1e-3
+            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_grid, cell_size=cell_size) * 1e-3
             print(f"Global stats after gridding: {global_gridded_stats:.2f} km.")
     
     # save the xarray dataset
@@ -534,7 +542,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
 
 def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="value/grid-cell", source=None, time=None, 
                  cell_size=1, fold_field=None, fold_function="sum", attr_field=None, shapefile_path=None, 
-                 output_directory=None, output_filename=None, value_per_area=False, zero_is_value=False, verbose=False):
+                 output_directory=None, output_filename=None, value_per_grid=False, zero_is_value=False, verbose=False):
     
     """
     Converts point data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
@@ -576,7 +584,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
         Directory where the output netCDF file will be saved. Default is None.
     output_filename : str, optional
         Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
-    value_per_area : bool, optional
+    value_per_grid : bool, optional
         If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
     zero_is_value : bool, optional
         If True, treats zero values as valid data rather than as no-data. Default is False.
@@ -620,7 +628,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
             # Determine fold_field, long_name, and units for the current iteration
             current_fold_field = fold_field or "count"
             current_long_name = utils.reverse_replace_special_characters(filter_var)
-            current_units = utils.determine_units_point(units, value_per_area)
+            current_units = utils.determine_units_point(units, value_per_grid)
 
             # Convert joined GeoDataFrame to xarray dataset
             ds_var = utils.gridded_poly_2_xarray(
@@ -632,7 +640,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
                 time=time,
                 cell_size=cell_size,
                 variable_name=filter_var,
-                value_per_area=value_per_area,
+                value_per_area=value_per_grid,
                 zero_is_value=zero_is_value
             )
 
@@ -641,7 +649,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
                 global_summary_stats = utils.dataframe_stats_point(dataframe=filtered_gdf, fold_field=current_fold_field, fold_function=fold_function)
                 print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f}")
                 var_name = utils.replace_special_characters(filter_var)
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_area, cell_size=cell_size)
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_grid, cell_size=cell_size)
                 print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f}")
 
             print("\n")
@@ -656,7 +664,7 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
         # Determine fold_field, long_name, and units
         fold_field = fold_field or "count"
         long_name = utils.determine_long_name_point(fold_field, variable_name, long_name, fold_function)
-        units = utils.determine_units_point(units, value_per_area)
+        units = utils.determine_units_point(units, value_per_grid)
         
         ds = utils.gridded_poly_2_xarray(
             polygon_gdf=joined_gdf,
@@ -667,14 +675,14 @@ def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="val
             time=time,
             cell_size=cell_size,
             variable_name=variable_name,
-            value_per_area=value_per_area,
+            value_per_area=value_per_grid,
             zero_is_value=zero_is_value
         )
 
         if verbose:
             global_summary_stats = utils.dataframe_stats_point(dataframe=points_gdf, fold_field=fold_field, fold_function=fold_function)
             print(f"Global stats before gridding : {global_summary_stats:.2f}")
-            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, value_per_area=value_per_area, cell_size=cell_size)
+            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, value_per_area=value_per_grid, cell_size=cell_size)
             print(f"Global stats after gridding: {global_gridded_stats:.2f}")
     
     # save the xarray dataset
@@ -933,7 +941,7 @@ def average_variables(variables=None, dataset=None, new_variable_name=None, time
     return ds
 
 
-def grid_2_table(netcdf_path=None, dataset=None, variable=None, time=None, grid_area=None, cell_size=1, aggregation=None, method='sum', verbose=False):
+def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, cell_size=1, aggregation=None, fold_function='sum', verbose=False, netcdf_path=None):
     """
     Process gridded data from an xarray Dataset to generate tabular data for different jurisdictions.
 
@@ -951,8 +959,8 @@ def grid_2_table(netcdf_path=None, dataset=None, variable=None, time=None, grid_
         Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
     aggregation : str, optional
         Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
-    method : str, optional
-        Aggregation method. Options: 'sum', 'mean', 'max'.
+    fold_function : str, optional, default 'sum'
+        Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.
 
     Returns:
     --------
@@ -960,8 +968,8 @@ def grid_2_table(netcdf_path=None, dataset=None, variable=None, time=None, grid_
         Tabular data for different jurisdictions, including ISO3 codes, variable values, and optional 'Year' column.
     """
    
-    df = utils.grid_2_table(input_netcdf_path=netcdf_path, ds=dataset, variable=variable, time=time, 
-                           grid_area=grid_area, cell_size=cell_size, aggregation=aggregation, method=method, 
+    df = utils.grid_2_table(input_netcdf_path=netcdf_path, ds=dataset, variables=variables, time=time, 
+                           grid_area=grid_area, cell_size=cell_size, aggregation=aggregation, method=fold_function, 
                            verbose=verbose)
     return df
 
