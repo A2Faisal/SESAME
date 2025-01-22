@@ -223,7 +223,7 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
         if raster_path:
             base_filename = os.path.splitext(os.path.basename(raster_path))[0]
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
-
+    print("Re-gridding completed!")
     return ds
 
 
@@ -339,7 +339,7 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
                 print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km2.")
                 filter_var = utils.replace_special_characters(filter_var)
                 global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=filter_var, fold_field=grid_value,
-                                                              value_per_area=fraction, cell_size=cell_size) * 1e-6
+                                                              value_per_area=True, cell_size=cell_size) * 1e-6
                 print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km2.")
 
             print("\n")

@@ -24,6 +24,7 @@ def identify_lat_lon_names(netcdf_path):
     common_lat_names = [
         'lat',
         'latitude',
+        'Latitude',
         'y',
         'south_north',
         'grid_latitude',
@@ -35,6 +36,7 @@ def identify_lat_lon_names(netcdf_path):
     common_lon_names = [
         'lon',
         'longitude',
+        'Longitude',
         'x',
         'west_east',
         'grid_longitude',

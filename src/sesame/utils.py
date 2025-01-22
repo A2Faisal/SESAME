@@ -750,7 +750,10 @@ def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
         lat = np.flip(lat)
         array = np.flipud(array)  # Flip the array vertically to match the lat reversal
     
-    transform = from_origin(min_lon, max_lat, (max_lon - min_lon) / width, (max_lat - min_lat) / height)
+    # transform = from_origin(min_lon, max_lat, (max_lon - min_lon) / width, (max_lat - min_lat) / height)
+    lon_res = lon[1] - lon[0]
+    lat_res = abs(lat[1] - lat[0])
+    transform = from_origin(min_lon, max_lat, lon_res, lat_res)
 
     # Prepare for writing the TIFF file
     metadata = {
@@ -764,7 +767,8 @@ def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
     }
     
     # Generate the output TIFF path
-    raster_layer = f"{netcdf_variable}_{time[:10] if time else ''}.tif"
+    time_str = str(time)
+    raster_layer = f"{netcdf_variable}_{time_str[:10] if time else ''}.tif"
     output_raster = os.path.join(temp_path, raster_layer)
     
     # Write the data to a TIFF file
@@ -884,6 +888,34 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
 
 
 
+# Replace only true artifacts in DataArray
+def replace_artifacts_in_dataarray(da):
+    # Temporarily replace NaN with a placeholder to avoid casting warnings
+    temp_array = da.fillna(-99999)
+
+    # Detect artifacts: Values equal to their integer representation but not part of valid ranges
+    # Refine this range logic based on the characteristics of your valid data
+    is_artifact = (temp_array == temp_array.astype(int)) & (temp_array != -99999) & (temp_array < 1e5)
+
+    # Replace artifacts with NaN
+    da_cleaned = da.where(~is_artifact, np.nan)
+    return da_cleaned
+
+
+# Replace only true artifacts in DataArray
+def replace_artifacts_in_dataarray(da):
+    # Temporarily replace NaN with a placeholder to avoid casting warnings
+    temp_array = da
+
+    # Detect artifacts: Values equal to their integer representation but not part of valid ranges
+    # Refine this range logic based on the characteristics of your valid data
+    is_artifact = temp_array == temp_array.astype(int)
+
+    # Replace artifacts with NaN
+    da_cleaned = da.where(~is_artifact, np.nan)
+    return da_cleaned
+
+
 def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="value/grid-cell", source=None, cell_size=1,
                      time=None, zero_is_value=None, value_per_area=False, verbose=False):
     
@@ -903,7 +935,9 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
     # Check if the dimensions are perfectly divisible within the tolerance
     if abs(num_rows / num_lat - round(num_rows / num_lat)) < tolerance and abs(num_cols / num_lon - round(num_cols / num_lon)) < tolerance:
         padded_arr = arr
+        padded = False
     else:
+        padded = True  # Padding is applied
         # Calculate padding needed for the array
         lat_padding = num_lat - (arr.shape[0] % num_lat)
         lon_padding = num_lon - (arr.shape[1] % num_lon)
@@ -923,18 +957,17 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
 
     aligned_arr = np.zeros((num_lat, num_lon, lat_factor, lon_factor))
 
-
     for i in range(num_lat):
         for j in range(num_lon):
             lat_start = i * lat_factor
             lat_end = (i + 1) * lat_factor
             lon_start = j * lon_factor
             lon_end = (j + 1) * lon_factor
-
             aligned_arr[i, j] = padded_arr[lat_start:lat_end, lon_start:lon_end]
 
     lat_resolution = cell_size
     lon_resolution = cell_size
+
     lat = np.linspace(90 - lat_resolution / 2, -90 + lat_resolution / 2, num=num_lat)
     lon = np.linspace(-180 + lon_resolution / 2, 180 - lon_resolution / 2, num=num_lon)
 
@@ -946,6 +979,7 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
     # Perform the aggregation over the lat_factor and lon_factor dimensions
     if fold_function.upper() == 'SUM':
         da_agg = da.sum(dim=['lat_factor', 'lon_factor'])
+
     elif fold_function.upper() == 'MEAN':
         if zero_is_value and zero_is_value.upper() == "YES":
             da_agg = da.mean(dim=['lat_factor', 'lon_factor'])
@@ -965,18 +999,22 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
         da_agg = da.std(dim=['lat_factor', 'lon_factor'])
     else:
         raise ValueError("Conversion should be either SUM, MEAN, MAX, MIN or STD")
+    
+    # Replace artifacts only if padding was applied
+    # if padded:
+    #     cleaned_ds = replace_artifacts_in_dataarray(da_agg)
+    #     da_agg = cleaned_ds
 
     if verbose and fold_function.upper() == 'SUM':
         print(f"Raw global {fold_function}: {raw_global_value:.3f}")
         regridded_global_value = da_agg.sum().item()
         print(f"Re-gridded global {fold_function}: {regridded_global_value:.3f}")
-
-    da = da_agg
     
     # convert dataarray to dataset
-    ds = da_to_ds(da, variable_name, long_name, units, source, time, cell_size, zero_is_value, value_per_area)
+    ds = da_to_ds(da_agg, variable_name, long_name, units, source, time, cell_size, zero_is_value, value_per_area)
 
     return ds
+
 
 
 
@@ -1080,7 +1118,7 @@ def compute_weighted_statistics(gdf, stat='sum'):
 
 
 def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value/grid-cell", source=None, cell_size=1,
-                     time=None, zero_is_value=None, value_per_area=False, resampling_method='bilinear', verbose=False):
+                     time=None, zero_is_value=None, value_per_area=False, verbose=False):
     
     # Step-1: Check the cell size
     # Open the input raster using rasterio
