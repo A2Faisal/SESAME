@@ -151,7 +151,7 @@ def add_variable_attributes(ds, variable_name, long_name, units, source=None, ti
             "axis": "T"}
         ds['time'].attrs = time_attr
 
-    if zero_is_value and zero_is_value.upper() == "YES":
+    if zero_is_value:
         ds = ds
     else:
         # Replace the 0 values to NaN, where zero shows evidence of absence.
@@ -981,7 +981,7 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
         da_agg = da.sum(dim=['lat_factor', 'lon_factor'])
 
     elif fold_function.upper() == 'MEAN':
-        if zero_is_value and zero_is_value.upper() == "YES":
+        if zero_is_value:
             da_agg = da.mean(dim=['lat_factor', 'lon_factor'])
         else:
             # Calculate the sum and count of non-zero values
@@ -1118,7 +1118,7 @@ def compute_weighted_statistics(gdf, stat='sum'):
 
 
 def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value/grid-cell", source=None, cell_size=1,
-                     time=None, zero_is_value=None, value_per_area=False, verbose=False):
+                     time=None, zero_is_value=False, value_per_area=False, verbose=False):
     
     # Step-1: Check the cell size
     # Open the input raster using rasterio
