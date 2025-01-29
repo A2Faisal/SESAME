@@ -509,7 +509,7 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
         joined_gdf = utils.line_intersect(polygons_gdf, lines_gdf, fold_field=fold_field, fold_function=fold_function)
 
         # Determine fold_field, long_name, and units
-        fold_field = "length_m"
+        fold_field = fold_field or "length_m"
         long_name = utils.determine_long_name_line(long_name, fold_field, variable_name)
         units = utils.determine_units_line(units, value_per_grid)
         ds = utils.gridded_poly_2_xarray(
@@ -526,10 +526,16 @@ def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter
         )
         
         if verbose:
-            global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, fold_field=fold_field, fold_function=fold_function)
-            print(f"Global stats before gridding : {global_summary_stats:.2f} km.")
-            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_grid, cell_size=cell_size) * 1e-3
-            print(f"Global stats after gridding: {global_gridded_stats:.2f} km.")
+            if fold_field == "length_m":
+                global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, fold_field=fold_field, fold_function=fold_function)
+                print(f"Global stats before gridding : {global_summary_stats:.2f} km.")
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_grid, cell_size=cell_size) * 1e-3
+                print(f"Global stats after gridding: {global_gridded_stats:.2f} km.")
+            else:
+                global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, fold_field=fold_field, fold_function=fold_function)
+                print(f"Global stats before gridding : {global_summary_stats:.2f}.")
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_grid, cell_size=cell_size)
+                print(f"Global stats after gridding: {global_gridded_stats:.2f}.")
     
     # save the xarray dataset
     if output_directory:

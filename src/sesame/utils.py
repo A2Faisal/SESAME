@@ -27,9 +27,13 @@ import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
 
+# warning_message = (
+#     "The land fraction data is not available at the resolution you requested, which prevents taking into account the portion of coastal grid cells that are not land.\n"
+#     "Instead, the calculated values will be referenced to the total grid area per cell."
+# )
+
 warning_message = (
-    "The land fraction data is not available at the resolution you requested, which prevents taking into account the portion of coastal grid cells that are not land.\n"
-    "Instead, the calculated values will be referenced to the total grid area per cell."
+    "The land fraction data is not available at the resolution you requested. Only grid_area variables is added to the final dataset."
 )
 
 global_attr = {'Project': 'Surface Earth System Analysis and Modeling Environment (SESAME)',
@@ -234,6 +238,14 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
             # land_frac["land_area"] = land_frac["land_area"].where(land_frac["land_area"] != 0, np.nan)
             # ds[variable_name] = ds[variable_name] / land_frac["land_area"]
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+            
+    elif cell_size_str == "0.25":
+        base_directory = os.path.dirname(os.path.abspath(__file__))        
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25.nc"))
+        # Merge with the dataset
+        ds = xr.merge([ds, grid_ds])       
+        if value_per_area:
+            ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     else:
         gdf = create.create_gridded_polygon(cell_size=cell_size, grid_area="yes")
         grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
@@ -367,13 +379,15 @@ def determine_long_name_line(long_name, fold_field, variable_name):
     return long_name
         
 
-def dataframe_stats_line(dataframe, fold_field=None, fold_function="sum", verbose=False):
+def dataframe_stats_line(dataframe, fold_field=None, fold_function="sum"):
     if fold_function.lower() == "sum":
-        if fold_field is None or fold_field == "length_m":
+        if fold_field is None:
+            global_summary_stats = dataframe[variable_name].sum()
+            return global_summary_stats
+        else:
+            variable_name = fold_field or "length_m"
             dataframe = calculate.calculate_geometry_attributes(dataframe)
-            global_summary_stats = dataframe['length_m'].sum()
-            if verbose:
-                print(f"Global stats before gridding: {global_summary_stats:.2f}")
+            global_summary_stats = dataframe["length_m"].sum()
             return global_summary_stats * 1e-3
     else:
         raise ValueError(f"Unsupported fold_function: {fold_function}. Choose 'sum'. or set verbose=False")
@@ -625,6 +639,13 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
         # ds[variable_name] = ds[variable_name] / np.maximum(ds[variable_name], ds["land_area"])
         # # Ensure no values are greater than 1, keeping NaNs unchanged
         # ds[variable_name] = ds[variable_name].where(ds[variable_name].isnull() | (ds[variable_name] <= 1), 1)
+        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+    
+    elif cell_size_str == "0.25":
+        base_directory = os.path.dirname(os.path.abspath(__file__))        
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25.nc"))
+        # Merge with the dataset
+        ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
 
     else:
