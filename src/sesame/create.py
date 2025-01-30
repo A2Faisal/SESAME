@@ -209,12 +209,4 @@ def create_new_ds(input_ds, tabular_column, country_ds, netcdf_variable, input_d
 
     return new_ds
 
-def create_temp_folder(input_path, folder_name="temp"):
-    parent_dir = os.path.dirname(os.path.dirname(input_path))
-    path = os.path.join(parent_dir, folder_name)
-
-    if not os.path.exists(path):
-        os.makedirs(path)
-        print(f"The temporary folder is created, and the path is {path}")
-    return path
 

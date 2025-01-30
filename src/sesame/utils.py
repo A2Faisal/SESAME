@@ -238,6 +238,14 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
             # land_frac["land_area"] = land_frac["land_area"].where(land_frac["land_area"] != 0, np.nan)
             # ds[variable_name] = ds[variable_name] / land_frac["land_area"]
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+    
+    elif cell_size_str == "0.5":
+        base_directory = os.path.dirname(os.path.abspath(__file__))        
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5.nc"))
+        # Merge with the dataset
+        ds = xr.merge([ds, grid_ds])       
+        if value_per_area:
+            ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
             
     elif cell_size_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
@@ -271,8 +279,7 @@ def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, cell_size, 
     
     # merge with the dataset
     variable_name = variable_name if variable_name else grid_value
-    ds = add_variable_attributes(ds=ds, variable_name=variable_name, long_name=long_name, 
-                                     units=units, source=source, time=time, zero_is_value=zero_is_value)
+    ds = add_variable_attributes(ds=ds, variable_name=variable_name, long_name=long_name, units=units, source=source, time=time, zero_is_value=zero_is_value)
 
     return ds
 
@@ -640,6 +647,13 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
         # # Ensure no values are greater than 1, keeping NaNs unchanged
         # ds[variable_name] = ds[variable_name].where(ds[variable_name].isnull() | (ds[variable_name] <= 1), 1)
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
+
+    elif cell_size_str == "0.5":
+        base_directory = os.path.dirname(os.path.abspath(__file__))        
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5.nc"))
+        # Merge with the dataset
+        ds = xr.merge([ds, grid_ds])       
+        ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     
     elif cell_size_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
@@ -994,8 +1008,7 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
 
 
     # Create an xarray DataArray with dimensions and coordinates
-    da = xr.DataArray(aligned_arr, dims=("lat", "lon", "lat_factor", "lon_factor"),
-                      coords={"lat": lat, "lon": lon})
+    da = xr.DataArray(aligned_arr, dims=("lat", "lon", "lat_factor", "lon_factor"), coords={"lat": lat, "lon": lon})
 
     # Perform the aggregation over the lat_factor and lon_factor dimensions
     if fold_function.upper() == 'SUM':
@@ -1257,6 +1270,8 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
                 cntry_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
             elif cell_size_str == "0.5":
                 cntry_ds = xr.load_dataset(os.path.join(base_directory, "Country_Fraction.0_5deg.2000-2023.nc"))
+            elif cell_size_str == "0.25":
+                cntry_ds = xr.load_dataset(os.path.join(base_directory, "Country_Fraction.0_25deg.2000-2023.nc"))
         except FileNotFoundError as e:
             print(f"Error while reading file {e}")
 
@@ -1336,7 +1351,7 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
                 tabular_stat = df[var].std() 
             else:
                 raise ValueError(f"Unsupported fold function: {method}")
-          
+
         print(f"Global tabular stats for {var}: {tabular_stat:.2f}")
 
         dataframes.append(df)
@@ -1359,9 +1374,12 @@ def check_iso3_with_country_ds(df, cell_size_str):
     if cell_size_str == "1" or cell_size_str == "1.0":
         cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
     elif cell_size_str == "0.5":
-        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc")) 
+        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
+    elif cell_size_str == "0.25":
+        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc")) 
     else:
-        raise ValueError("Please re-grid the netcdf file to 1 or 0.5 degree.")
+        raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")
+    
     cntry_vars = [var for var in cntry.variables if var not in cntry.coords]
     df_list = list(df["ISO3"].unique())
     # Find unmatched ISO3 countries

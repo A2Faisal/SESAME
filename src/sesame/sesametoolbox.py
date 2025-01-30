@@ -97,7 +97,7 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
   
     base_directory = os.path.dirname(os.path.abspath(__file__))
     if cell_size_str == "1" or cell_size_str == "1.0":
-        country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
+        country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
         # Remove surrogate variable if land_frac is 0
         # grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
         # grid_ds["land_frac"] = grid_ds["land_frac"].where(grid_ds["land_frac"] == 0, 1)
@@ -107,9 +107,16 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
 
     elif cell_size_str == "0.5":
-        country_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc")) 
+        country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
+        input_ds = input_ds.copy()
+        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+        
+    elif cell_size_str == "0.25":
+        country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
+        input_ds = input_ds.copy()
+        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
     else:
-        raise ValueError("Please re-grid the netcdf file to 1 or 0.5 degree.")
+        raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")
 
     input_ds, country_ds, a = utils.adjust_datasets(input_ds, country_ds, time)
     print(f"Distributing {variable_name} onto {netcdf_variable}.")
