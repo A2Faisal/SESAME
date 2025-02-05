@@ -230,7 +230,7 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
     if cell_size_str == "1" or cell_size_str == "1.0":
         # Add grid area variable
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if value_per_area:
@@ -241,7 +241,7 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
     
     elif cell_size_str == "0.5":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5.nc"))
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if value_per_area:
@@ -249,7 +249,7 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
             
     elif cell_size_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25.nc"))
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if value_per_area:
@@ -637,7 +637,7 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
     cell_size_str = str(cell_size)
     if cell_size_str == "1" or cell_size_str == "1.0":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
         ds = xr.merge([ds, grid_ds])
         # # ensure there is no grid values if land fraction is 0
         # land_frac_da = xr.where(ds["land_frac"] > 0, 1, ds["land_frac"])
@@ -650,14 +650,14 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
 
     elif cell_size_str == "0.5":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5.nc"))
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     
     elif cell_size_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25.nc"))
+        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
