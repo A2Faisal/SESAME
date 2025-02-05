@@ -758,6 +758,7 @@ def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
     if time is not None:
         data = data.sel(time=time, method="nearest").drop_vars("time")
     
+    data = data.squeeze()  # Remove any singleton dimensions
     # Extract the data array
     array = data.values
     
@@ -1372,11 +1373,11 @@ def check_iso3_with_country_ds(df, cell_size_str):
     base_directory = os.path.dirname(os.path.abspath(__file__))
     
     if cell_size_str == "1" or cell_size_str == "1.0":
-        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
+        cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
     elif cell_size_str == "0.5":
-        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
+        cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
     elif cell_size_str == "0.25":
-        cntry = xr.load_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc")) 
+        cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc")) 
     else:
         raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")
     
