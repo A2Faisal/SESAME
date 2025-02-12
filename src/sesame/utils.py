@@ -230,7 +230,7 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
     if cell_size_str == "1" or cell_size_str == "1.0":
         # Add grid area variable
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
+        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if value_per_area:
@@ -241,7 +241,7 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
     
     elif cell_size_str == "0.5":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
+        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if value_per_area:
@@ -249,7 +249,7 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
             
     elif cell_size_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
+        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if value_per_area:
@@ -451,10 +451,6 @@ def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per
     elif variable_name and fold_field:
         variable_name = variable_name
     if value_per_area:
-        # cell_size_str = str(cell_size)
-        # if cell_size_str == "1" or cell_size_str == "1.0":
-        #     global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["land_area"]).sum().item()
-        # else:
         global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["grid_area"]).sum().item()
     else:
         global_gridded_stats = (dataset[variable_name]).sum().item()
@@ -637,7 +633,7 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
     cell_size_str = str(cell_size)
     if cell_size_str == "1" or cell_size_str == "1.0":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
+        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
         ds = xr.merge([ds, grid_ds])
         # # ensure there is no grid values if land fraction is 0
         # land_frac_da = xr.where(ds["land_frac"] > 0, 1, ds["land_frac"])
@@ -650,14 +646,14 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
 
     elif cell_size_str == "0.5":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
+        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     
     elif cell_size_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.load_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
+        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
@@ -923,37 +919,8 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
     return dst_array, x_cell_size, y_cell_size
 
 
-
-# Replace only true artifacts in DataArray
-def replace_artifacts_in_dataarray(da):
-    # Temporarily replace NaN with a placeholder to avoid casting warnings
-    temp_array = da.fillna(-99999)
-
-    # Detect artifacts: Values equal to their integer representation but not part of valid ranges
-    # Refine this range logic based on the characteristics of your valid data
-    is_artifact = (temp_array == temp_array.astype(int)) & (temp_array != -99999) & (temp_array < 1e5)
-
-    # Replace artifacts with NaN
-    da_cleaned = da.where(~is_artifact, np.nan)
-    return da_cleaned
-
-
-# Replace only true artifacts in DataArray
-def replace_artifacts_in_dataarray(da):
-    # Temporarily replace NaN with a placeholder to avoid casting warnings
-    temp_array = da
-
-    # Detect artifacts: Values equal to their integer representation but not part of valid ranges
-    # Refine this range logic based on the characteristics of your valid data
-    is_artifact = temp_array == temp_array.astype(int)
-
-    # Replace artifacts with NaN
-    da_cleaned = da.where(~is_artifact, np.nan)
-    return da_cleaned
-
-
 def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="value/grid-cell", source=None, cell_size=1,
-                     time=None, zero_is_value=None, value_per_area=False, verbose=False):
+                     time=None, zero_is_value=None, padding="symmetric", value_per_area=False, verbose=False):
     
     arr = array.astype(np.float64)
 
@@ -971,21 +938,23 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
     # Check if the dimensions are perfectly divisible within the tolerance
     if abs(num_rows / num_lat - round(num_rows / num_lat)) < tolerance and abs(num_cols / num_lon - round(num_cols / num_lon)) < tolerance:
         padded_arr = arr
-        padded = False
     else:
-        padded = True  # Padding is applied
         # Calculate padding needed for the array
         lat_padding = num_lat - (arr.shape[0] % num_lat)
         lon_padding = num_lon - (arr.shape[1] % num_lon)
-    
-        # Distribute the padding evenly to the start and end of the array
-        lat_padding_start = lat_padding // 2
-        lat_padding_end = lat_padding - lat_padding_start
-        lon_padding_start = lon_padding // 2
-        lon_padding_end = lon_padding - lon_padding_start
-    
-        # Pad the array with zeros
-        padded_arr = np.pad(arr, ((lat_padding_start, lat_padding_end), (lon_padding_start, lon_padding_end)), mode='constant', constant_values=0)
+        
+        if padding.lower() == "end":
+            # Distribute the padding only to the end of the array
+            padded_arr = np.pad(arr, ((0, lat_padding), (0, lon_padding)), mode='constant', constant_values=0)
+        else:
+            # Distribute the padding evenly to the start and end of the array
+            lat_padding_start = lat_padding // 2
+            lat_padding_end = lat_padding - lat_padding_start
+            lon_padding_start = lon_padding // 2
+            lon_padding_end = lon_padding - lon_padding_start
+            # Pad the array with zeros
+            padded_arr = np.pad(arr, ((lat_padding_start, lat_padding_end), (lon_padding_start, lon_padding_end)), mode='constant', constant_values=0)
+        
 
     # Calculate factors for latitude and longitude
     lat_factor = padded_arr.shape[0] // num_lat
@@ -1034,11 +1003,6 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
         da_agg = da.std(dim=['lat_factor', 'lon_factor'])
     else:
         raise ValueError("Conversion should be either SUM, MEAN, MAX, MIN or STD")
-    
-    # Replace artifacts only if padding was applied
-    # if padded:
-    #     cleaned_ds = replace_artifacts_in_dataarray(da_agg)
-    #     da_agg = cleaned_ds
 
     if verbose and fold_function.upper() == 'SUM':
         print(f"Raw global {fold_function}: {raw_global_value:.3f}")
@@ -1052,7 +1016,6 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
 
 
 
-
 def xy_not_eq(raster_path, fold_function, variable_name, long_name, units, source=None, time=None, cell_size=1, 
                                  value_per_area=False, zero_is_value=False):
     # Convert raster to polygon GeoDataFrame
@@ -1062,7 +1025,7 @@ def xy_not_eq(raster_path, fold_function, variable_name, long_name, units, sourc
     # Create gridded polygon GeoDataFrame
     polygons_gdf = create.create_gridded_polygon(cell_size=cell_size)
     # Perform intersection
-    intersections = gpd.overlay(gdf, polygons_gdf, how='intersection')
+    intersections = gpd.overlay(gdf, polygons_gdf, how='intersection', keep_geom_type=True)
     # Calculate geometry attributes
     intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="in_area")
     # Calculate the fraction
@@ -1153,7 +1116,7 @@ def compute_weighted_statistics(gdf, stat='sum'):
 
 
 def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value/grid-cell", source=None, cell_size=1,
-                     time=None, zero_is_value=False, value_per_area=False, verbose=False):
+                     time=None, padding="symmetric", zero_is_value=False, value_per_area=False, verbose=False):
     
     # Step-1: Check the cell size
     # Open the input raster using rasterio
@@ -1174,7 +1137,7 @@ def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value
             array, x_cell_size, y_cell_size = reproject_and_fill(input_raster)
             ds = regrid_array_2_ds(array=array, fold_function=fold_function, variable_name=variable_name, 
                                    long_name=long_name, units=units, source=source, cell_size=cell_size, 
-                                   time=time, zero_is_value=zero_is_value, value_per_area=value_per_area, 
+                                   time=time, padding=padding, zero_is_value=zero_is_value, value_per_area=value_per_area, 
                                    verbose=verbose)
         else:
             ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
@@ -1230,11 +1193,11 @@ def delete_temporary_folder(folder_path):
 
 
 def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, grid_area=False, cell_size=1, aggregation=None, method='sum', verbose=False):
+    
     base_directory = os.path.dirname(os.path.abspath(__file__))
-
     # Load dataset from NetCDF file if provided
     if input_netcdf_path:
-        ds = xr.load_dataset(input_netcdf_path)
+        ds = xr.open_dataset(input_netcdf_path)
 
     if not isinstance(ds, xr.Dataset):
         raise ValueError("Please provide either a NetCDF file path or an xarray Dataset.")
@@ -1268,11 +1231,11 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
         try:
             cell_size_str = str(cell_size)
             if cell_size_str == "1" or cell_size_str == "1.0":
-                cntry_ds = xr.load_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
+                cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
             elif cell_size_str == "0.5":
-                cntry_ds = xr.load_dataset(os.path.join(base_directory, "Country_Fraction.0_5deg.2000-2023.nc"))
+                cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
             elif cell_size_str == "0.25":
-                cntry_ds = xr.load_dataset(os.path.join(base_directory, "Country_Fraction.0_25deg.2000-2023.nc"))
+                cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
         except FileNotFoundError as e:
             print(f"Error while reading file {e}")
 

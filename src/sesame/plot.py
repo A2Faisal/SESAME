@@ -12,6 +12,12 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from matplotlib.colorbar import ColorbarBase
 from matplotlib.colors import Normalize
+import geopandas as gpd
+import cartopy.crs as ccrs
+from matplotlib.colors import ListedColormap
+import cartopy
+import seaborn as sns
+import mapclassify as mc
 
 
 def plot_histogram(variable, dataset=None, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None, netcdf_directory=None):
@@ -560,4 +566,95 @@ def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', colo
         plt.savefig(filename, dpi=600, bbox_inches='tight')
 
     # Show the plot
+    plt.show()
+
+
+def plot_country(column, df=None, title="Map", label=None, color_palette='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None, wrapped_labels=False):
+    
+    if df is None and csv_path is None:
+        raise ValueError("Either 'pandas dataframe' or 'csv path' must be provided.")
+    elif df is not None and csv_path is not None:
+        raise ValueError("Only one of pandas dataframe' or 'csv path' should be provided.")
+    
+    if csv_path:
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8')
+        except UnicodeDecodeError:
+            df = pd.read_csv(csv_path, encoding='latin1')
+    
+    # Load and project the world shapefile
+    base_directory = os.path.dirname(os.path.abspath(__file__))
+    shapefile_path =  os.path.join(base_directory, "CShapes_v2_converted_2023.shp")
+    world_gdf = gpd.read_file(shapefile_path)
+    world_gdf = world_gdf.to_crs('EPSG:4326')
+    robinson_proj = ccrs.Robinson()
+    world_gdf = world_gdf.to_crs(robinson_proj.proj4_init)
+
+    # Merge the shapefile with the DataFrame
+    merged = world_gdf.merge(df, on='ISO3')
+
+    # Classifier configuration
+    if class_type == 'natural':
+        classifier = mc.NaturalBreaks(merged[column], k=num_classes)
+    elif class_type == 'equal':
+        classifier = mc.EqualInterval(merged[column], k=num_classes)
+    elif class_type == 'quantiles':
+        classifier = mc.Quantiles(merged[column], k=num_classes)
+    elif class_type == 'log10':
+        merged[column] = np.log10(merged[column] + 1)  # Adding 1 to avoid log10(0)
+        classifier = mc.NaturalBreaks(merged[column], k=num_classes)
+        
+
+    merged['class'] = classifier.yb
+    merged = merged.sort_values(by='class')
+
+    # Get the unique class values and their boundaries
+    class_bins = classifier.bins
+    # Create the class range list based on the bins
+    class_ranges = []
+    previous_bin = 0
+    for bin_edge in class_bins:
+        class_ranges.append(f"{int(previous_bin)} - {int(bin_edge)}")
+        previous_bin = bin_edge
+
+    # Assign the class ranges back to the DataFrame
+    class_ranges.append(f"{int(previous_bin)} - {int(merged[column].max())}")
+    merged['class_range'] = merged['class'].apply(lambda x: class_ranges[x])
+    unique_classes = merged['class_range'].unique()    
+    
+    # Set up the plot
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()}, figsize=(12, 6))
+    ax.set_global()
+    ax.add_feature(cartopy.feature.COASTLINE, linewidth=0.75)
+    ax.add_feature(cartopy.feature.BORDERS, linewidth=0.5)
+
+    # Set colormap
+    cmap = ListedColormap(sns.color_palette(color_palette, num_classes).as_hex())
+
+    # Plotting
+    merged.plot(column='class', cmap=cmap, linewidth=0, ax=ax, edgecolor='0.8', legend=False)
+    sm = plt.cm.ScalarMappable(cmap=cmap)
+    sm.set_array([])  # Important for ensuring the colorbar recognizes the full range
+    cbar = fig.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.046, pad=0.04)
+    cbar.set_label(label, fontsize=12)
+
+    # Setting custom labels without tick marks
+    tick_locations = np.linspace(0.5 / num_classes, 1 - 0.5 / num_classes, num_classes)
+
+    if wrapped_labels:
+        # Wrap the labels to fit
+        unique_classes = [label.replace(' - ', ' - \n') for label in unique_classes]
+    
+    cbar.set_ticks(tick_locations)
+    cbar.set_ticklabels(unique_classes, fontsize=10)
+    cbar.ax.set_xticklabels(unique_classes, rotation=45)
+    cbar.ax.tick_params(size=0)  
+    
+    # Add title and save the figure
+    plt.title(title, fontsize=14)
+    if output_dir and filename:
+        plt.savefig(output_dir + filename, dpi=600, bbox_inches='tight')
+    elif filename:
+        plt.savefig(filename, dpi=600, bbox_inches='tight')
+        
     plt.show()

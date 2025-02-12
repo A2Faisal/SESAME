@@ -155,7 +155,7 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
 
 
 def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, cell_size=1, netcdf_variable=None, output_directory=None, 
-                 output_filename=None, zero_is_value=False, value_per_grid=False, verbose=False):  
+                 output_filename=None, padding="symmetric", zero_is_value=False, value_per_grid=False, verbose=False):  
 
     """
     Converts raster data (TIFF or netCDF) into a re-gridded xarray dataset.
@@ -184,6 +184,8 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
         Directory where the output netCDF file will be saved. Default is None.
     output_filename : str, optional
         Filename for the output netCDF file. Default is None.
+    padding : str, optional
+        Padding strategy ('symmetric' or 'end').
     zero_is_value : bool, optional
         Whether to treat zero values as valid data rather than as no-data. Default is False.
     value_per_grid : bool, optional
@@ -210,7 +212,7 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
         print("Reading the tif file.")
         # Convert TIFF data to a re-gridded dataset
         ds = utils.tif_2_ds(input_raster=raster_path, fold_function=fold_function, variable_name=variable_name, 
-                      long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, 
+                      long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, padding=padding,
                       zero_is_value=zero_is_value, value_per_area=value_per_grid, verbose=verbose)
     
     elif file_extension == ".nc" or file_extension == ".nc4":
@@ -219,7 +221,7 @@ def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="val
         netcdf_tif_path = utils.netcdf_2_tif(netcdf_path=raster_path, netcdf_variable=netcdf_variable, time=time)
         # Convert netCDF data to a re-gridded dataset
         ds = utils.tif_2_ds(input_raster=netcdf_tif_path, fold_function=fold_function, variable_name=variable_name, 
-                      long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, 
+                      long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, padding=padding,
                       zero_is_value=zero_is_value, value_per_area=value_per_grid, verbose=verbose)
     else:
         # Print an error message for unrecognized file types
@@ -380,6 +382,8 @@ def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/gri
             global_summary_stats = utils.dataframe_stats_poly(dataframe=poly_gdf, fold_function=fold_function)
             print(f"Global stats before gridding : {global_summary_stats:.2f} km2.")
             variable_name = utils.replace_special_characters(variable_name)
+            if fraction:
+                value_per_grid = True
             global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=grid_value,
                                                               value_per_area=value_per_grid, cell_size=cell_size) * 1e-6
             print(f"Global stats after gridding: {global_gridded_stats:.2f} km2.")
@@ -1043,4 +1047,54 @@ def country_2_iso3(df, column):
             print(f"Country Not Found: {iso3_not_found}")
     return df
 
+def plot_country(column, dataframe=None, title="Map", label=None, color_palette='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None, wrapped_labels=False):
+    
+    """
+    Plots a choropleth map of a given column from a dataset, using different classification methods.
 
+    Parameters:
+    -----------
+    column : str
+        The name of the column in the dataset to visualize on the map.
+    dataframe : pandas.DataFrame, optional
+        The dataset containing country-level values. Either `df` or `csv_path` must be provided.
+    title : str, default="Map"
+        The title of the map.
+    label : str, optional
+        The label for the colorbar.
+    color_palette : str, default='viridis'
+        The color palette used for visualization. Should be a valid Seaborn palette.
+    num_classes : int, default=5
+        The number of classification bins for the data.
+    class_type : str, default='natural'
+        The classification method to use. Options:
+        - 'natural': Natural Breaks (Jenks)
+        - 'equal': Equal Interval
+        - 'quantiles': Quantiles
+        - 'log10': Log-transformed Natural Breaks
+    output_dir : str, optional
+        The directory where the plot should be saved (if saving is required).
+    filename : str, optional
+        The filename for saving the plot.
+    csv_path : str, optional
+        The path to a CSV file containing the data. Either `df` or `csv_path` must be provided.
+    wrapped_labels : bool, default=False
+        Whether to wrap the labels in the colorbar for better readability.
+
+    Raises:
+    -------
+    ValueError
+        If neither `df` nor `csv_path` is provided, or if both are provided.
+
+    Notes:
+    ------
+    - The function merges a country-level dataset with a world shapefile and applies classification.
+    - Uses Cartopy and Matplotlib to project and display the map.
+    - Classification methods allow different ways to categorize the data.
+
+    Returns:
+    --------
+    None
+        Displays the choropleth map using Matplotlib.
+    """
+    plot.plot_country(column=column, df=dataframe, title=title, label=label, color_palette=color_palette, num_classes=num_classes, class_type=class_type, output_dir=output_dir, filename=filename, csv_path=csv_path, wrapped_labels=wrapped_labels)
