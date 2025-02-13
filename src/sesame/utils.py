@@ -26,6 +26,7 @@ import get
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 # warning_message = (
 #     "The land fraction data is not available at the resolution you requested, which prevents taking into account the portion of coastal grid cells that are not land.\n"
@@ -172,7 +173,7 @@ def add_variable_attributes(ds, variable_name, long_name, units, source=None, ti
     
     return ds
 
-def gridded_poly_2_dataset(polygon_gdf, grid_value, cell_size, variable_name=None):
+def gridded_poly_2_dataset(polygon_gdf, grid_value, resolution, variable_name=None):
 
     warnings.filterwarnings('ignore', category=FutureWarning)
     warnings.filterwarnings('ignore', category=UserWarning)
@@ -185,11 +186,11 @@ def gridded_poly_2_dataset(polygon_gdf, grid_value, cell_size, variable_name=Non
     polygon_gdf['lon'] = polygon_gdf['geometry'].centroid.x
     polygon_gdf['lat'] = polygon_gdf['geometry'].centroid.y
 
-    num_lon_points = int(360 / cell_size)
-    num_lat_points = int(180 / cell_size)
+    num_lon_points = int(360 / resolution)
+    num_lat_points = int(180 / resolution)
 
-    lons = np.linspace(-180 + cell_size/2, 180 - cell_size/2, num_lon_points)
-    lats = np.linspace(-90 + cell_size/2, 90 - cell_size/2, num_lat_points)
+    lons = np.linspace(-180 + resolution/2, 180 - resolution/2, num_lon_points)
+    lats = np.linspace(-90 + resolution/2, 90 - resolution/2, num_lat_points)
 
     # Create a meshgrid of coordinates
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
@@ -218,7 +219,7 @@ def gridded_poly_2_dataset(polygon_gdf, grid_value, cell_size, variable_name=Non
                 'lon': (['lon'], lons)})
     return ds
 
-def add_grid_variables(ds, cell_size, variable_name, value_per_area):
+def add_grid_variables(ds, resolution, variable_name, normalize_by_area):
     
     # Ignore FutureWarning for other functions
     warnings.filterwarnings('ignore', category=FutureWarning)
@@ -226,41 +227,41 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
     # Ensure UserWarning is always shown during this function
     warnings.simplefilter('always', UserWarning)
     
-    cell_size_str = str(cell_size)
-    if cell_size_str == "1" or cell_size_str == "1.0":
+    resolution_str = str(resolution)
+    if resolution_str == "1" or resolution_str == "1.0":
         # Add grid area variable
         base_directory = os.path.dirname(os.path.abspath(__file__))        
         grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
-        if value_per_area:
+        if normalize_by_area:
             # # Replace 0 values in 'land_area' with NaN
             # land_frac["land_area"] = land_frac["land_area"].where(land_frac["land_area"] != 0, np.nan)
             # ds[variable_name] = ds[variable_name] / land_frac["land_area"]
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     
-    elif cell_size_str == "0.5":
+    elif resolution_str == "0.5":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
         grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
-        if value_per_area:
+        if normalize_by_area:
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
             
-    elif cell_size_str == "0.25":
+    elif resolution_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
         grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
-        if value_per_area:
+        if normalize_by_area:
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     else:
-        gdf = create.create_gridded_polygon(cell_size=cell_size, grid_area="yes")
-        grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
+        gdf = create.create_gridded_polygon(resolution=resolution, grid_area="yes")
+        grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", resolution=resolution)
         attrs = {'long_name': "Area of Grids", 'units': "m2"}
         grid_ds["grid_area"].attrs = attrs
         ds = xr.merge([ds, grid_ds])
-        if value_per_area:
+        if normalize_by_area:
             # Issue a warning if land fraction data is not available at the desired resolution
             warnings.warn(warning_message, UserWarning)
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
@@ -270,12 +271,12 @@ def add_grid_variables(ds, cell_size, variable_name, value_per_area):
 
     return ds
 
-def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, cell_size, source=None, time=None, variable_name=None, value_per_area=False, zero_is_value=False):
+def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, resolution, source=None, time=None, variable_name=None, normalize_by_area=False, zero_is_value=False):
 
-    ds = gridded_poly_2_dataset(polygon_gdf=polygon_gdf, grid_value=grid_value, variable_name=variable_name, cell_size=cell_size)
+    ds = gridded_poly_2_dataset(polygon_gdf=polygon_gdf, grid_value=grid_value, variable_name=variable_name, resolution=resolution)
     variable_name = replace_special_characters(variable_name)
 
-    ds = add_grid_variables(ds=ds, cell_size=cell_size, variable_name=variable_name, value_per_area=value_per_area)
+    ds = add_grid_variables(ds=ds, resolution=resolution, variable_name=variable_name, normalize_by_area=normalize_by_area)
     
     # merge with the dataset
     variable_name = variable_name if variable_name else grid_value
@@ -283,7 +284,7 @@ def gridded_poly_2_xarray(polygon_gdf, grid_value, long_name, units, cell_size, 
 
     return ds
 
-def da_to_ds(da, variable_name, long_name, units, source=None, time=None, cell_size=1, zero_is_value=False, value_per_area=False):
+def da_to_ds(da, variable_name, long_name, units, source=None, time=None, resolution=1, zero_is_value=False, normalize_by_area=False):
     """
     Convert a DataArray to a Dataset including additional metadata and attributes.
 
@@ -302,7 +303,7 @@ def da_to_ds(da, variable_name, long_name, units, source=None, time=None, cell_s
     time : str or None, optional
         Time information. If provided and not 'recent', a time dimension is added to the dataset.
         Default is None.
-    cell_size : float, optional
+    resolution : float, optional
         Grid cell size for latitude and longitude bounds calculations. Default is 1.
 
     Returns
@@ -345,8 +346,8 @@ def da_to_ds(da, variable_name, long_name, units, source=None, time=None, cell_s
         ds[variable_name] = ds[variable_name].where(ds[variable_name] != 0, np.nan)
 
     # add grid area variable
-    cell_size = abs(float(ds['lat'].diff('lat').values[0]))
-    ds = add_grid_variables(ds=ds, cell_size=cell_size, variable_name=variable_name, value_per_area=value_per_area)
+    resolution = abs(float(ds['lat'].diff('lat').values[0]))
+    ds = add_grid_variables(ds=ds, resolution=resolution, variable_name=variable_name, normalize_by_area=normalize_by_area)
 
     # Add variable metadata
     attrs = {'long_name': long_name, 'units': units}
@@ -359,98 +360,98 @@ def da_to_ds(da, variable_name, long_name, units, source=None, time=None, cell_s
     
     return ds
 
-def determine_long_name_point(fold_field, variable_name, long_name, fold_function):
+def determine_long_name_point(agg_column, variable_name, long_name, agg_function):
     if long_name is None:
-        if fold_field is None or (fold_function is not None and fold_function.lower() == 'sum'):
+        if agg_column is None or (agg_function is not None and agg_function.lower() == 'sum'):
             return reverse_replace_special_characters(variable_name) if variable_name else "count"
     return long_name if long_name else "count"
 
 
-def determine_units_line(units, value_per_area):
-    if units == "meter/grid-cell" and value_per_area:
+def determine_units_line(units, normalize_by_area):
+    if units == "meter/grid-cell" and normalize_by_area:
         return "m m-2"
     return units
 
-def determine_long_name_line(fold_field, variable_name, long_name, fold_function):
+def determine_long_name_line(agg_column, variable_name, long_name, agg_function):
     if long_name is None:
-        if fold_field is None or (fold_function is not None and fold_function.lower() == 'sum'):
-            return reverse_replace_special_characters(variable_name) if variable_name else reverse_replace_special_characters(f"length_{fold_function.lower()}")
-    return long_name if long_name else reverse_replace_special_characters(f"length_{fold_function.lower()}")
+        if agg_column is None or (agg_function is not None and agg_function.lower() == 'sum'):
+            return reverse_replace_special_characters(variable_name) if variable_name else reverse_replace_special_characters(f"length_{agg_function.lower()}")
+    return long_name if long_name else reverse_replace_special_characters(f"length_{agg_function.lower()}")
 
-def determine_long_name_line(long_name, fold_field, variable_name):
+def determine_long_name_line(long_name, agg_column, variable_name):
     if long_name is None:
         if variable_name:
             long_name = reverse_replace_special_characters(variable_name)
         else:
-            long_name = reverse_replace_special_characters(fold_field)
+            long_name = reverse_replace_special_characters(agg_column)
     return long_name
         
 
-def dataframe_stats_line(dataframe, fold_field=None, fold_function="sum"):
-    if fold_function.lower() == "sum":
-        if fold_field is None:
+def dataframe_stats_line(dataframe, agg_column=None, agg_function="sum"):
+    if agg_function.lower() == "sum":
+        if agg_column is None:
             global_summary_stats = dataframe[variable_name].sum()
             return global_summary_stats
         else:
-            variable_name = fold_field or "length_m"
+            variable_name = agg_column or "length_m"
             dataframe = calculate.calculate_geometry_attributes(dataframe)
             global_summary_stats = dataframe["length_m"].sum()
             return global_summary_stats * 1e-3
     else:
-        raise ValueError(f"Unsupported fold_function: {fold_function}. Choose 'sum'. or set verbose=False")
+        raise ValueError(f"Unsupported agg_function: {agg_function}. Choose 'sum'. or set verbose=False")
     
-def determine_units_poly(units, value_per_area, fraction):
+def determine_units_poly(units, normalize_by_area, fraction):
     if fraction:
-        if fraction and not value_per_area:
+        if fraction and not normalize_by_area:
             return "fraction"
-        if fraction and value_per_area:
+        if fraction and normalize_by_area:
             raise ValueError("Fraction and value per area cannot be created together.")
-    elif value_per_area:
+    elif normalize_by_area:
         units = "m2 m-2"
     return units
     
 
-def determine_long_name_poly(variable_name, long_name, fold_function):
+def determine_long_name_poly(variable_name, long_name, agg_function):
     if long_name is None:
-        if variable_name is None or (fold_function is not None and fold_function.lower() == 'sum'):
+        if variable_name is None or (agg_function is not None and agg_function.lower() == 'sum'):
             return reverse_replace_special_characters(variable_name) if variable_name else "area"
     return long_name if long_name else "area"
 
 
-def dataframe_stats_poly(dataframe, fold_function="sum"):
-    if fold_function.lower() == "sum":
+def dataframe_stats_poly(dataframe, agg_function="sum"):
+    if agg_function.lower() == "sum":
         dataframe = calculate.calculate_geometry_attributes(dataframe)
         global_summary_stats = dataframe['area_m2'].sum()
         return global_summary_stats * 1e-6
     else:
-        raise ValueError(f"Unsupported fold_function: {fold_function}. Choose 'sum'. or set verbose=False")
+        raise ValueError(f"Unsupported agg_function: {agg_function}. Choose 'sum'. or set verbose=False")
     
 
-def determine_units_point(units, value_per_area):
-    if units == "value/grid-cell" and value_per_area:
+def determine_units_point(units, normalize_by_area):
+    if units == "value/grid-cell" and normalize_by_area:
         return "value m-2"
     return units
 
 
-def dataframe_stats_point(dataframe, fold_field=None, fold_function="sum"):
-    if fold_field is None or fold_field == "count":
-        if fold_function is None or fold_function.lower() == 'sum':
+def dataframe_stats_point(dataframe, agg_column=None, agg_function="sum"):
+    if agg_column is None or agg_column == "count":
+        if agg_function is None or agg_function.lower() == 'sum':
             global_summary_stats = len(dataframe)
         else:
-            raise ValueError(f"Unsupported fold_function: {fold_function}")
-    elif fold_function is not None and fold_function.lower() == 'sum' and fold_field is not None:
-        global_summary_stats = dataframe[fold_field].sum()
+            raise ValueError(f"Unsupported agg_function: {agg_function}")
+    elif agg_function is not None and agg_function.lower() == 'sum' and agg_column is not None:
+        global_summary_stats = dataframe[agg_column].sum()
     else:
-        raise ValueError(f"Unsupported combination of fold_field: {fold_field} and fold_function: {fold_function}")
+        raise ValueError(f"Unsupported combination of agg_column: {agg_column} and agg_function: {agg_function}")
     return global_summary_stats
 
 
-def xarray_dataset_stats(dataset, variable_name=None, fold_field=None, value_per_area=None, cell_size=1):
-    if variable_name is None and fold_field:
-        variable_name = fold_field
-    elif variable_name and fold_field:
+def xarray_dataset_stats(dataset, variable_name=None, agg_column=None, normalize_by_area=None, resolution=1):
+    if variable_name is None and agg_column:
+        variable_name = agg_column
+    elif variable_name and agg_column:
         variable_name = variable_name
-    if value_per_area:
+    if normalize_by_area:
         global_gridded_stats = (dataset[variable_name].fillna(0) * dataset["grid_area"]).sum().item()
     else:
         global_gridded_stats = (dataset[variable_name]).sum().item()
@@ -464,7 +465,7 @@ def save_to_nc(ds, output_directory=None, output_filename=None, base_filename=No
         else:
             ds.to_netcdf(output_directory + base_filename + ".nc")
             
-def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function='sum', x_offset=0.0001, y_offset=0.0001):
+def point_spatial_join(polygons_gdf, points_gdf, agg_column=None, agg_function='sum', x_offset=0.0001, y_offset=0.0001):
     # Adjust points to ensure they are within or correctly intersecting polygons
     points_gdf = adjust_points(points_gdf, polygons_gdf, x_offset, y_offset)
     
@@ -472,22 +473,22 @@ def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function=
     points_within_polygons = gpd.sjoin(points_gdf, polygons_gdf, predicate='intersects')
     
     # If field_name is provided, convert the column to numeric
-    if fold_field:
-        points_within_polygons[fold_field] = pd.to_numeric(points_within_polygons[fold_field], errors='coerce')
-        variable_name = replace_special_characters(fold_field)
+    if agg_column:
+        points_within_polygons[agg_column] = pd.to_numeric(points_within_polygons[agg_column], errors='coerce')
+        variable_name = replace_special_characters(agg_column)
         # Group by polygon and compute summary statistic based on operation
-        if fold_function.lower() == 'sum':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].sum().reset_index(name=variable_name)
-        elif fold_function.lower() == 'mean':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].mean().reset_index(name=variable_name)
-        elif fold_function.lower() == 'max':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].max().reset_index(name=variable_name)
-        elif fold_function.lower() == 'min':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].min().reset_index(name=variable_name)            
-        elif fold_function.lower() == 'std':
-            summary_stats = points_within_polygons.groupby('index_right')[fold_field].std().reset_index(name=variable_name)
+        if agg_function.lower() == 'sum':
+            summary_stats = points_within_polygons.groupby('index_right')[agg_column].sum().reset_index(name=variable_name)
+        elif agg_function.lower() == 'mean':
+            summary_stats = points_within_polygons.groupby('index_right')[agg_column].mean().reset_index(name=variable_name)
+        elif agg_function.lower() == 'max':
+            summary_stats = points_within_polygons.groupby('index_right')[agg_column].max().reset_index(name=variable_name)
+        elif agg_function.lower() == 'min':
+            summary_stats = points_within_polygons.groupby('index_right')[agg_column].min().reset_index(name=variable_name)            
+        elif agg_function.lower() == 'std':
+            summary_stats = points_within_polygons.groupby('index_right')[agg_column].std().reset_index(name=variable_name)
         else:
-            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', 'std'.")
+            raise ValueError(f"Unsupported operation: {agg_column}. Choose from 'sum', 'mean', 'max', 'std'.")
     
         # Merge summary statistics with polygons GeoDataFrame
         polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_index=True, right_on='index_right')
@@ -501,7 +502,7 @@ def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function=
     
     return polygons_gdf
 
-def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function='sum', x_offset=0.0001, y_offset=0.0001):
+def point_spatial_join(polygons_gdf, points_gdf, agg_column=None, agg_function='sum', x_offset=0.0001, y_offset=0.0001):
     # Ensure both GeoDataFrames use the same CRS
     if polygons_gdf.crs != points_gdf.crs:
         points_gdf = points_gdf.to_crs(polygons_gdf.crs)
@@ -512,22 +513,22 @@ def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function=
     # Perform intersection
     intersections = gpd.overlay(points_gdf, polygons_gdf, how='intersection')
     
-    # If fold_field is provided, convert the column to numeric
-    if fold_field:
-        intersections[fold_field] = pd.to_numeric(intersections[fold_field], errors='coerce')
+    # If agg_column is provided, convert the column to numeric
+    if agg_column:
+        intersections[agg_column] = pd.to_numeric(intersections[agg_column], errors='coerce')
         # Group by polygon and compute summary statistic based on operation
-        if fold_function.lower() == 'sum':
-            intersections = intersections.groupby('uid')[fold_field].sum().reset_index()
-        elif fold_function.lower() == 'mean':
-            intersections = intersections.groupby('uid')[fold_field].mean().reset_index()
-        elif fold_function.lower() == 'max':
-            intersections = intersections.groupby('uid')[fold_field].max().reset_index()
-        elif fold_function.lower() == 'min':
-            intersections = intersections.groupby('uid')[fold_field].min().reset_index()
-        elif fold_function.lower() == 'std':
-            intersections = intersections.groupby('uid')[fold_field].std().reset_index()
+        if agg_function.lower() == 'sum':
+            intersections = intersections.groupby('uid')[agg_column].sum().reset_index()
+        elif agg_function.lower() == 'mean':
+            intersections = intersections.groupby('uid')[agg_column].mean().reset_index()
+        elif agg_function.lower() == 'max':
+            intersections = intersections.groupby('uid')[agg_column].max().reset_index()
+        elif agg_function.lower() == 'min':
+            intersections = intersections.groupby('uid')[agg_column].min().reset_index()
+        elif agg_function.lower() == 'std':
+            intersections = intersections.groupby('uid')[agg_column].std().reset_index()
         else:
-            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', min, 'std'.")
+            raise ValueError(f"Unsupported operation: {agg_column}. Choose from 'sum', 'mean', 'max', min, 'std'.")
 
     else:
         intersections = intersections.groupby('uid').size().reset_index(name='count')
@@ -536,7 +537,7 @@ def point_spatial_join(polygons_gdf, points_gdf, fold_field=None, fold_function=
     return joined_gdf
     
 
-def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'):
+def line_intersect(polygons_gdf, lines_gdf, agg_column=None, agg_function='sum'):
     
     # Ensure both GeoDataFrames use the same CRS
     if polygons_gdf.crs != lines_gdf.crs:
@@ -551,41 +552,41 @@ def line_intersect(polygons_gdf, lines_gdf, fold_field=None, fold_function='sum'
     # Calculate geometry attributes for intersections
     intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="length_m")
 
-    # If fold_field is provided, convert the column to numeric
-    if fold_field:
-        intersections[fold_field] = pd.to_numeric(intersections[fold_field], errors='coerce')
-        # variable_name = replace_special_characters(fold_field)
+    # If agg_column is provided, convert the column to numeric
+    if agg_column:
+        intersections[agg_column] = pd.to_numeric(intersections[agg_column], errors='coerce')
+        # variable_name = replace_special_characters(agg_column)
         # Group by polygon and compute summary statistic based on operation
-        if fold_function.lower() == 'sum':
-            intersections = intersections.groupby('uid')[fold_field].sum().reset_index()
-        elif fold_function.lower() == 'mean':
-            intersections = intersections.groupby('uid')[fold_field].mean().reset_index()
-        elif fold_function.lower() == 'max':
-            intersections = intersections.groupby('uid')[fold_field].max().reset_index()
-        elif fold_function.lower() == 'min':
-            intersections = intersections.groupby('uid')[fold_field].min().reset_index()
-        elif fold_function.lower() == 'std':
-            intersections = intersections.groupby('uid')[fold_field].std().reset_index()
+        if agg_function.lower() == 'sum':
+            intersections = intersections.groupby('uid')[agg_column].sum().reset_index()
+        elif agg_function.lower() == 'mean':
+            intersections = intersections.groupby('uid')[agg_column].mean().reset_index()
+        elif agg_function.lower() == 'max':
+            intersections = intersections.groupby('uid')[agg_column].max().reset_index()
+        elif agg_function.lower() == 'min':
+            intersections = intersections.groupby('uid')[agg_column].min().reset_index()
+        elif agg_function.lower() == 'std':
+            intersections = intersections.groupby('uid')[agg_column].std().reset_index()
         else:
-            raise ValueError(f"Unsupported operation: {fold_field}. Choose from 'sum', 'mean', 'max', min, 'std'.")
+            raise ValueError(f"Unsupported operation: {agg_column}. Choose from 'sum', 'mean', 'max', min, 'std'.")
 
     else:
-        if fold_function.lower() == "sum":
+        if agg_function.lower() == "sum":
             intersections = intersections.groupby('uid')['length_m'].sum().reset_index()
-        elif fold_function.lower() == "mean":
+        elif agg_function.lower() == "mean":
             intersections = intersections.groupby('uid')['length_m'].mean().reset_index()
-        elif fold_function.lower() == "max":
+        elif agg_function.lower() == "max":
             intersections = intersections.groupby('uid')['length_m'].max().reset_index()
-        elif fold_function.lower() == "min":
+        elif agg_function.lower() == "min":
             intersections = intersections.groupby('uid')['length_m'].min().reset_index()
-        elif fold_function.lower() == "std":
+        elif agg_function.lower() == "std":
             intersections = intersections.groupby('uid')['length_m'].std().reset_index()
     
     joined_gdf = polygons_gdf.merge(intersections, on='uid', how='left')
     return joined_gdf
 
 
-def convert_xarray_to_gdf(ds, variable_name, cell_size=1):
+def convert_xarray_to_gdf(ds, variable_name, resolution=1):
     # Extract the data variable as a NumPy array
     data = ds[variable_name].values
     
@@ -602,10 +603,10 @@ def convert_xarray_to_gdf(ds, variable_name, cell_size=1):
         for j in range(data.shape[1]):
             # Define the corners of the polygon centered around (lons[j], lats[i])
             polygon = Polygon([
-                (lons[j] - cell_size / 2, lats[i] - cell_size / 2),  # Bottom left corner
-                (lons[j] + cell_size / 2, lats[i] - cell_size / 2),  # Bottom right corner
-                (lons[j] + cell_size / 2, lats[i] + cell_size / 2),  # Top right corner
-                (lons[j] - cell_size / 2, lats[i] + cell_size / 2)   # Top left corner
+                (lons[j] - resolution / 2, lats[i] - resolution / 2),  # Bottom left corner
+                (lons[j] + resolution / 2, lats[i] - resolution / 2),  # Bottom right corner
+                (lons[j] + resolution / 2, lats[i] + resolution / 2),  # Top right corner
+                (lons[j] - resolution / 2, lats[i] + resolution / 2)   # Top left corner
             ])
             polygons.append(polygon)
             values.append(data[i, j])  # Use the corresponding value
@@ -619,7 +620,7 @@ def convert_xarray_to_gdf(ds, variable_name, cell_size=1):
     return gdf
 
 
-def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
+def poly_fraction(ds, variable_name, resolution, polygons_gdf=None):
 
     # Ignore FutureWarning for other functions
     warnings.filterwarnings('ignore', category=FutureWarning)
@@ -630,8 +631,8 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
     # Save the attributes of the variable
     attrs = ds[variable_name].attrs
 
-    cell_size_str = str(cell_size)
-    if cell_size_str == "1" or cell_size_str == "1.0":
+    resolution_str = str(resolution)
+    if resolution_str == "1" or resolution_str == "1.0":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
         grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
         ds = xr.merge([ds, grid_ds])
@@ -644,14 +645,14 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
         # ds[variable_name] = ds[variable_name].where(ds[variable_name].isnull() | (ds[variable_name] <= 1), 1)
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
 
-    elif cell_size_str == "0.5":
+    elif resolution_str == "0.5":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
         grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     
-    elif cell_size_str == "0.25":
+    elif resolution_str == "0.25":
         base_directory = os.path.dirname(os.path.abspath(__file__))        
         grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
@@ -661,7 +662,7 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
     else:
         # Issue a warning if land fraction data is not available at the desired resolution
         warnings.warn(warning_message, UserWarning)
-        grid_ds = gridded_poly_2_dataset(polygon_gdf=polygons_gdf, grid_value="grid_area", cell_size=cell_size)
+        grid_ds = gridded_poly_2_dataset(polygon_gdf=polygons_gdf, grid_value="grid_area", resolution=resolution)
         attrs = {'long_name': "Area of Grids", 'units': "m2"}
         grid_ds["grid_area"].attrs = attrs
         ds = xr.merge([ds, grid_ds])
@@ -674,7 +675,7 @@ def poly_fraction(ds, variable_name, cell_size, polygons_gdf=None):
     warnings.simplefilter('default', UserWarning)
     return ds
 
-def poly_intersect(poly_gdf, polygons_gdf, variable_name, long_name, units, source, time, cell_size, fold_function="sum", value_per_area=None, zero_is_value=None, fraction=False):
+def poly_intersect(poly_gdf, polygons_gdf, variable_name, long_name, units, source, time, resolution, agg_function="sum", normalize_by_area=None, zero_is_value=None, fraction=False):
     
     warnings.filterwarnings('ignore', category=FutureWarning)
     warnings.filterwarnings('ignore', category=UserWarning)
@@ -687,15 +688,15 @@ def poly_intersect(poly_gdf, polygons_gdf, variable_name, long_name, units, sour
     # Calculate geometry attributes for intersections
     intersections = calculate.calculate_geometry_attributes(input_gdf=intersections, column_name="in_area")
 
-    if fold_function.lower() == "sum":
+    if agg_function.lower() == "sum":
         intersections = intersections.groupby('uid')['in_area'].sum().reset_index()
-    elif fold_function.lower() == "mean":
+    elif agg_function.lower() == "mean":
         intersections = intersections.groupby('uid')['in_area'].mean().reset_index()
-    elif fold_function.lower() == "max":
+    elif agg_function.lower() == "max":
         intersections = intersections.groupby('uid')['in_area'].max().reset_index()
-    elif fold_function.lower() == "min":
+    elif agg_function.lower() == "min":
         intersections = intersections.groupby('uid')['in_area'].min().reset_index()
-    elif fold_function.lower() == "std":
+    elif agg_function.lower() == "std":
         intersections = intersections.groupby('uid')['in_area'].std().reset_index()
 
     joined_gdf = polygons_gdf.merge(intersections, on='uid', how='left')
@@ -707,14 +708,14 @@ def poly_intersect(poly_gdf, polygons_gdf, variable_name, long_name, units, sour
                 units=units,
                 source=source,
                 time=time,
-                cell_size=cell_size,
+                resolution=resolution,
                 variable_name=variable_name,
-                value_per_area=value_per_area,
+                normalize_by_area=normalize_by_area,
                 zero_is_value=zero_is_value
             )
 
     if fraction:
-        ds = poly_fraction(ds=ds, variable_name=variable_name, cell_size=cell_size, polygons_gdf=polygons_gdf)
+        ds = poly_fraction(ds=ds, variable_name=variable_name, resolution=resolution, polygons_gdf=polygons_gdf)
 
     return ds
 
@@ -913,24 +914,24 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
             dst_array = final_array
 
     # Calculate the cell size in x and y direction
-    x_cell_size = (dst_extent[2] - dst_extent[0]) / dst_width
-    y_cell_size = (dst_extent[3] - dst_extent[1]) / dst_height
+    x_resolution = (dst_extent[2] - dst_extent[0]) / dst_width
+    y_resolution = (dst_extent[3] - dst_extent[1]) / dst_height
 
-    return dst_array, x_cell_size, y_cell_size
+    return dst_array, x_resolution, y_resolution
 
 
-def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="value/grid-cell", source=None, cell_size=1,
-                     time=None, zero_is_value=None, padding="symmetric", value_per_area=False, verbose=False):
+def regrid_array_2_ds(array, agg_function, variable_name, long_name, units="value/grid-cell", source=None, resolution=1,
+                     time=None, zero_is_value=None, padding="symmetric", normalize_by_area=False, verbose=False):
     
     arr = array.astype(np.float64)
 
     # Calculate raw global value based on the conversion type
-    if fold_function.upper() == 'SUM':
+    if agg_function.upper() == 'SUM':
         raw_global_value = arr.sum()
 
     # Get dimensions and calculate grid resolution
     num_rows, num_cols = arr.shape
-    num_lat, num_lon = calculate.calculate_grid_resolution(resolution=cell_size)
+    num_lat, num_lon = calculate.calculate_grid_resolution(resolution=resolution)
     
     # Set a tolerance level
     tolerance = 0.01
@@ -970,8 +971,8 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
             lon_end = (j + 1) * lon_factor
             aligned_arr[i, j] = padded_arr[lat_start:lat_end, lon_start:lon_end]
 
-    lat_resolution = cell_size
-    lon_resolution = cell_size
+    lat_resolution = resolution
+    lon_resolution = resolution
 
     lat = np.linspace(90 - lat_resolution / 2, -90 + lat_resolution / 2, num=num_lat)
     lon = np.linspace(-180 + lon_resolution / 2, 180 - lon_resolution / 2, num=num_lon)
@@ -981,10 +982,10 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
     da = xr.DataArray(aligned_arr, dims=("lat", "lon", "lat_factor", "lon_factor"), coords={"lat": lat, "lon": lon})
 
     # Perform the aggregation over the lat_factor and lon_factor dimensions
-    if fold_function.upper() == 'SUM':
+    if agg_function.upper() == 'SUM':
         da_agg = da.sum(dim=['lat_factor', 'lon_factor'])
 
-    elif fold_function.upper() == 'MEAN':
+    elif agg_function.upper() == 'MEAN':
         if zero_is_value:
             da_agg = da.mean(dim=['lat_factor', 'lon_factor'])
         else:
@@ -995,35 +996,35 @@ def regrid_array_2_ds(array, fold_function, variable_name, long_name, units="val
             da_agg_nan = da_sum / da_count.where(da_count != 0, np.nan)
             # Replace nan values with 0
             da_agg = da_agg_nan.fillna(0)
-    elif fold_function.upper() == 'MAX':
+    elif agg_function.upper() == 'MAX':
         da_agg = da.max(dim=['lat_factor', 'lon_factor'])
-    elif fold_function.upper() == 'MIN':
+    elif agg_function.upper() == 'MIN':
         da_agg = da.min(dim=['lat_factor', 'lon_factor'])
-    elif fold_function.upper() == 'STD':
+    elif agg_function.upper() == 'STD':
         da_agg = da.std(dim=['lat_factor', 'lon_factor'])
     else:
         raise ValueError("Conversion should be either SUM, MEAN, MAX, MIN or STD")
 
-    if verbose and fold_function.upper() == 'SUM':
-        print(f"Raw global {fold_function}: {raw_global_value:.3f}")
+    if verbose and agg_function.upper() == 'SUM':
+        print(f"Raw global {agg_function}: {raw_global_value:.3f}")
         regridded_global_value = da_agg.sum().item()
-        print(f"Re-gridded global {fold_function}: {regridded_global_value:.3f}")
+        print(f"Re-gridded global {agg_function}: {regridded_global_value:.3f}")
     
     # convert dataarray to dataset
-    ds = da_to_ds(da_agg, variable_name, long_name, units, source, time, cell_size, zero_is_value, value_per_area)
+    ds = da_to_ds(da_agg, variable_name, long_name, units, source, time, resolution, zero_is_value, normalize_by_area)
 
     return ds
 
 
 
-def xy_not_eq(raster_path, fold_function, variable_name, long_name, units, source=None, time=None, cell_size=1, 
-                                 value_per_area=False, zero_is_value=False):
+def xy_not_eq(raster_path, agg_function, variable_name, long_name, units, source=None, time=None, resolution=1, 
+                                 normalize_by_area=False, zero_is_value=False):
     # Convert raster to polygon GeoDataFrame
     gdf = raster_to_polygon_gdf(raster_file=raster_path)
     gdf = gdf.fillna(0)
     gdf = calculate.calculate_geometry_attributes(input_gdf=gdf, column_name="ras_area")
     # Create gridded polygon GeoDataFrame
-    polygons_gdf = create.create_gridded_polygon(cell_size=cell_size)
+    polygons_gdf = create.create_gridded_polygon(resolution=resolution)
     # Perform intersection
     intersections = gpd.overlay(gdf, polygons_gdf, how='intersection', keep_geom_type=True)
     # Calculate geometry attributes
@@ -1031,13 +1032,13 @@ def xy_not_eq(raster_path, fold_function, variable_name, long_name, units, sourc
     # Calculate the fraction
     intersections["frac"] = intersections["in_area"] / intersections["ras_area"]
     # compute statistics
-    result_df = compute_weighted_statistics(gdf=intersections, stat=fold_function)
+    result_df = compute_weighted_statistics(gdf=intersections, stat=agg_function)
     # Merge results with polygons_gdf
     joined_gdf = polygons_gdf.merge(result_df, on='uid', how='left')
     variable_name = replace_special_characters(variable_name)
-    ds = gridded_poly_2_xarray(polygon_gdf=joined_gdf, grid_value=fold_function, long_name=long_name, 
-                                 units=units, source=source, time=time, variable_name=variable_name, cell_size=cell_size, 
-                                 value_per_area=value_per_area, zero_is_value=zero_is_value)
+    ds = gridded_poly_2_xarray(polygon_gdf=joined_gdf, grid_value=agg_function, long_name=long_name, 
+                                 units=units, source=source, time=time, variable_name=variable_name, resolution=resolution, 
+                                 normalize_by_area=normalize_by_area, zero_is_value=zero_is_value)
     return ds
 
 
@@ -1115,8 +1116,8 @@ def compute_weighted_statistics(gdf, stat='sum'):
 
 
 
-def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value/grid-cell", source=None, cell_size=1,
-                     time=None, padding="symmetric", zero_is_value=False, value_per_area=False, verbose=False):
+def tif_2_ds(input_raster, variable_name, agg_function, long_name, units="value/grid-cell", source=None, resolution=1,
+                     time=None, padding="symmetric", zero_is_value=False, normalize_by_area=False, verbose=False):
     
     # Step-1: Check the cell size
     # Open the input raster using rasterio
@@ -1134,15 +1135,15 @@ def tif_2_ds(input_raster, variable_name, fold_function, long_name, units="value
         # Check if x_size is approximately equal to y_size
         if abs(x_size - y_size) <= tolerance:
             # re-grid
-            array, x_cell_size, y_cell_size = reproject_and_fill(input_raster)
-            ds = regrid_array_2_ds(array=array, fold_function=fold_function, variable_name=variable_name, 
-                                   long_name=long_name, units=units, source=source, cell_size=cell_size, 
-                                   time=time, padding=padding, zero_is_value=zero_is_value, value_per_area=value_per_area, 
+            array, x_resolution, y_resolution = reproject_and_fill(input_raster)
+            ds = regrid_array_2_ds(array=array, agg_function=agg_function, variable_name=variable_name, 
+                                   long_name=long_name, units=units, source=source, resolution=resolution, 
+                                   time=time, padding=padding, zero_is_value=zero_is_value, normalize_by_area=normalize_by_area, 
                                    verbose=verbose)
         else:
-            ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, fold_function=fold_function, 
-                           long_name=long_name, units=units, source=source, time=time, cell_size=cell_size, 
-                           value_per_area=value_per_area, zero_is_value=zero_is_value)
+            ds = xy_not_eq(raster_path=input_raster, variable_name=variable_name, agg_function=agg_function, 
+                           long_name=long_name, units=units, source=source, time=time, resolution=resolution, 
+                           normalize_by_area=normalize_by_area, zero_is_value=zero_is_value)
     return ds
 
 
@@ -1192,7 +1193,7 @@ def delete_temporary_folder(folder_path):
         print(f"Error deleting the folder: {e}")
 
 
-def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, grid_area=False, cell_size=1, aggregation=None, method='sum', verbose=False):
+def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, grid_area=False, resolution=1, aggregation=None, method='sum', verbose=False):
     
     base_directory = os.path.dirname(os.path.abspath(__file__))
     # Load dataset from NetCDF file if provided
@@ -1229,12 +1230,12 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
     # Loop through each variable in the dataset
     for var in variables_list:
         try:
-            cell_size_str = str(cell_size)
-            if cell_size_str == "1" or cell_size_str == "1.0":
+            resolution_str = str(resolution)
+            if resolution_str == "1" or resolution_str == "1.0":
                 cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
-            elif cell_size_str == "0.5":
+            elif resolution_str == "0.5":
                 cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
-            elif cell_size_str == "0.25":
+            elif resolution_str == "0.25":
                 cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
         except FileNotFoundError as e:
             print(f"Error while reading file {e}")
@@ -1261,8 +1262,8 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
             else:
                 if verbose:
                     print("grid_area not found in the dataset. Creating a new one.")
-                gdf = create.create_gridded_polygon(cell_size=cell_size, grid_area="yes")
-                grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", cell_size=cell_size)
+                gdf = create.create_gridded_polygon(resolution=resolution, grid_area="yes")
+                grid_ds = gridded_poly_2_dataset(polygon_gdf=gdf, grid_value="grid_area", resolution=resolution)
 
             ds_var = ds_var * grid_ds
 
@@ -1332,14 +1333,14 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
     return merged_df
 
 
-def check_iso3_with_country_ds(df, cell_size_str):
+def check_iso3_with_country_ds(df, resolution_str):
     base_directory = os.path.dirname(os.path.abspath(__file__))
     
-    if cell_size_str == "1" or cell_size_str == "1.0":
+    if resolution_str == "1" or resolution_str == "1.0":
         cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
-    elif cell_size_str == "0.5":
+    elif resolution_str == "0.5":
         cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
-    elif cell_size_str == "0.25":
+    elif resolution_str == "0.25":
         cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc")) 
     else:
         raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")

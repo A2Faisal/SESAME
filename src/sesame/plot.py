@@ -405,14 +405,14 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
 
 
 
-def plot_time_series(variable, dataset=None, fold_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None, netcdf_directory=None):
+def plot_time_series(variable, dataset=None, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None, netcdf_directory=None):
     """
     Create a line plot and/or area plot for a time series data variable.
     
     Parameters:
     - ds: xarray.Dataset, the dataset containing the variable to plot.
     - variable: str, the name of the variable to plot.
-    - fold_function: str, the operation to apply ('sum', 'mean', 'max', 'std').
+    - agg_function: str, the operation to apply ('sum', 'mean', 'max', 'std').
     - smoothing_window: int, optional, the window size for rolling mean smoothing.
     - plot_type: str, optional, the type of plot ('line', 'area', 'both'). Default is 'both'.
     - color: str, optional, the color of the plot. Default is 'blue'.
@@ -445,16 +445,16 @@ def plot_time_series(variable, dataset=None, fold_function='sum', plot_type='bot
     data_var = ds[variable]
 
     # Perform the specified operation along the spatial dimensions
-    if fold_function.lower() == 'sum':
+    if agg_function.lower() == 'sum':
         time_series = data_var.sum(dim=('lat', 'lon'))
-    elif fold_function.lower() == 'mean':
+    elif agg_function.lower() == 'mean':
         time_series = data_var.mean(dim=('lat', 'lon'))
-    elif fold_function.lower() == 'max':
+    elif agg_function.lower() == 'max':
         time_series = data_var.max(dim=('lat', 'lon'))
-    elif fold_function.lower() == 'std':
+    elif agg_function.lower() == 'std':
         time_series = data_var.std(dim=('lat', 'lon'))
     else:
-        raise ValueError(f"Unsupported operation '{fold_function}'. Use 'sum', 'mean', 'max', or 'std'.")
+        raise ValueError(f"Unsupported operation '{agg_function}'. Use 'sum', 'mean', 'max', or 'std'.")
     
     # Apply rolling mean smoothing if specified
     if smoothing_window:

@@ -56,13 +56,13 @@ def calculate_geometry_attributes(input_gdf):
 
     return gdf
 
-def create_gridded_polygon(cell_size, out_polygon_path=None, grid_area=False):
+def create_gridded_polygon(resolution, out_polygon_path=None, grid_area=False):
     """
     Create a gridded polygon shapefile with the specified cell size.
 
     Parameters:
     -----------
-    cell_size : float
+    resolution : float
         Size of each grid cell in degrees.
 
     polygon_path : str, optional
@@ -80,12 +80,12 @@ def create_gridded_polygon(cell_size, out_polygon_path=None, grid_area=False):
     xmin, ymin, xmax, ymax = -180, -90, 180, 90
     
     # Create grid cells
-    cols = np.arange(xmin, xmax, cell_size)
-    rows = np.arange(ymin, ymax, cell_size)
+    cols = np.arange(xmin, xmax, resolution)
+    rows = np.arange(ymin, ymax, resolution)
     polygons = []
     for x in cols:
         for y in rows:
-            polygons.append(Polygon([(x, y), (x + cell_size, y), (x + cell_size, y + cell_size), (x, y + cell_size)]))
+            polygons.append(Polygon([(x, y), (x + resolution, y), (x + resolution, y + resolution), (x, y + resolution)]))
     
     # Create a GeoDataFrame
     grid = gpd.GeoDataFrame({'geometry': polygons})
@@ -102,8 +102,8 @@ def create_gridded_polygon(cell_size, out_polygon_path=None, grid_area=False):
     
     # Save to shapefile
     if out_polygon_path:
-        cell_size_str = utils.replace_special_characters(str(cell_size))
-        filename = "World_" + cell_size_str + "deg.shp"
+        resolution_str = utils.replace_special_characters(str(resolution))
+        filename = "World_" + resolution_str + "deg.shp"
         grid.to_file(out_polygon_path + filename)    
     return grid
 

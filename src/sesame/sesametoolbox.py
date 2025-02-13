@@ -1,9 +1,6 @@
 import os
-import re
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Polygon, LineString, Point
-import pyproj
 import numpy as np
 import xarray as xr
 import json
@@ -21,9 +18,559 @@ import calculate
 import plot
 import get
 
+def point_2_grid(points_gdf=None, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, 
+                 resolution=1, agg_column=None, agg_function="sum", attr_field=None, shapefile_path=None, 
+                 output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+    
+    """
+    Converts point data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
+
+    Parameters
+    ----------
+    points_gdf : GeoDataFrame, optional
+        GeoDataFrame containing point data to be gridded. If not provided, `shapefile_path` must be specified.
+    shapefile_path : str, optional
+        Path to a shapefile containing point data, where the units of the data at each point are the same.
+    variable_name : str, optional
+        Name of the variable to include in the netCDF attributes metadata. Defaults to:
+        - The unique entries in the `attr_field` column if specified.
+        - The input filename without extension if `attr_field` and `variable_name` are not specified.
+    long_name : str, optional
+        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
+        `attr_field` is specified. Defaults to the input filename without extension if unspecified.
+    units : str, optional
+        Units of the data variable to include in the netCDF metadata. Default is "value/grid-cell".
+    source : str, optional
+        String describing the original source of the input data. This will be added to the netCDF metadata.
+    time : str, optional
+        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
+        value provided. Default is None (spatial, 2D netCDF output).
+    resolution : float, optional
+        Desired resolution for the grid cells in the output dataset. Default is 1 degree.
+    agg_column : str, optional
+        Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
+        Defaults to counting the number of points per grid cell.
+    agg_function : str, optional
+        Aggregation method for combining values in each grid cell. Options include:
+        - 'sum' (default): Sums all point values.
+        - 'max': Takes the maximum value.
+        - 'min': Takes the minimum value.
+        - 'std': Computes the standard deviation.
+    attr_field : str, optional
+        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
+    output_directory : str, optional
+        Directory where the output netCDF file will be saved. Default is None.
+    output_filename : str, optional
+        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
+    normalize_by_area : bool, optional
+        If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
+    zero_is_value : bool, optional
+        If True, treats zero values as valid data rather than as no-data. Default is False.
+    verbose : bool, optional
+        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+
+    Returns
+    -------
+    netCDF file
+        Transformed netCDF file with gridded data derived from the input point data.
+
+    Notes
+    -----
+    - The function supports input in the form of a shapefile or GeoDataFrame containing point data.
+    - If points lie exactly on a grid boundary, they are shifted by 0.0001 degrees in both latitude and longitude to ensure assignment to a grid cell.
+    - The function creates a netCDF file, where data variables are aggregated based on the `agg_column` and `agg_function`.
+    """
+
+    
+    if points_gdf is None and shapefile_path is None:
+        raise ValueError("Either 'points geodataframe' or 'shapefile directory' must be provided.")
+    elif points_gdf is not None and shapefile_path is not None:
+        raise ValueError("Only one of 'points geodataframe' or 'shapefile directory' should be provided.")
+
+    # create gridded polygon
+    polygons_gdf = create.create_gridded_polygon(resolution=resolution, out_polygon_path=None, grid_area=False)
+    
+    # spatial join
+    if shapefile_path:
+        points_gdf = gpd.read_file(shapefile_path)
+    
+    if attr_field is not None:
+        unique_rows = points_gdf[attr_field].unique().tolist()
+        dataset_list = []
+        
+        for filter_var in unique_rows:
+            # Filter the GeoDataFrame
+            filtered_gdf = points_gdf[points_gdf[attr_field] == filter_var].copy()
+            joined_gdf = utils.point_spatial_join(polygons_gdf, filtered_gdf, agg_column=agg_column, agg_function=agg_function)
+
+            # Determine agg_column, long_name, and units for the current iteration
+            current_agg_column = agg_column or "count"
+            current_long_name = utils.reverse_replace_special_characters(filter_var)
+            current_units = utils.determine_units_point(units, normalize_by_area)
+
+            # Convert joined GeoDataFrame to xarray dataset
+            ds_var = utils.gridded_poly_2_xarray(
+                polygon_gdf=joined_gdf,
+                grid_value=current_agg_column,
+                long_name=current_long_name,
+                units=current_units,
+                source=source,
+                time=time,
+                resolution=resolution,
+                variable_name=filter_var,
+                normalize_by_area=normalize_by_area,
+                zero_is_value=zero_is_value
+            )
+
+            # Print or process verbose information
+            if verbose:
+                global_summary_stats = utils.dataframe_stats_point(dataframe=filtered_gdf, agg_column=current_agg_column, agg_function=agg_function)
+                print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f}")
+                var_name = utils.replace_special_characters(filter_var)
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, normalize_by_area=normalize_by_area, resolution=resolution)
+                print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f}")
+
+            print("\n")
+            dataset_list.append(ds_var)
+        
+        # Merge all datasets from different filtered GeoDataFrames
+        ds = xr.merge(dataset_list)
+        
+    else:
+        joined_gdf = utils.point_spatial_join(polygons_gdf, points_gdf, agg_column=agg_column, agg_function=agg_function)
+
+        # Determine agg_column, long_name, and units
+        agg_column = agg_column or "count"
+        long_name = utils.determine_long_name_point(agg_column, variable_name, long_name, agg_function)
+        units = utils.determine_units_point(units, normalize_by_area)
+        
+        ds = utils.gridded_poly_2_xarray(
+            polygon_gdf=joined_gdf,
+            grid_value=agg_column,
+            long_name=long_name,
+            units=units,
+            source=source,
+            time=time,
+            resolution=resolution,
+            variable_name=variable_name,
+            normalize_by_area=normalize_by_area,
+            zero_is_value=zero_is_value
+        )
+
+        if verbose:
+            global_summary_stats = utils.dataframe_stats_point(dataframe=points_gdf, agg_column=agg_column, agg_function=agg_function)
+            print(f"Global stats before gridding : {global_summary_stats:.2f}")
+            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, normalize_by_area=normalize_by_area, resolution=resolution)
+            print(f"Global stats after gridding: {global_gridded_stats:.2f}")
+    
+    # save the xarray dataset
+    if output_directory:
+        if shapefile_path:
+            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
+        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
+    return ds
+
+def line_2_grid(lines_gdf=None, variable_name='variable', long_name='variable', units="meter/grid-cell", source=None, time=None, 
+                 resolution=1, agg_column=None, agg_function="sum", attr_field=None, shapefile_path=None, 
+                 output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+    
+    """
+    Converts line data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
+
+    Parameters
+    ----------
+    lines_gdf : GeoDataFrame, optional
+        GeoDataFrame containing line data to be gridded. If not provided, `shapefile_path` must be specified.
+    shapefile_path : str, optional
+        Path to a shapefile containing line data, where the units of the data at each line are the same 
+        (e.g., road width in meters).
+    variable_name : str, optional
+        Name of the variable to include in the netCDF attributes metadata. Defaults to:
+        - The unique entries in the `attr_field` column if specified.
+        - The input filename without extension if `attr_field` and `variable_name` are not specified.
+    long_name : str, optional
+        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
+        `attr_field` is specified. Defaults to the input filename without extension if unspecified.
+    units : str, optional
+        Units of the data variable to include in the netCDF metadata. Default is "meter/grid-cell".
+    source : str, optional
+        String describing the original source of the input data. This will be added to the netCDF metadata.
+    time : str, optional
+        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
+        value provided. Default is None (spatial, 2D netCDF output).
+    resolution : float, optional
+        Desired resolution for the grid cells in the output dataset. Default is 1 degree.
+    agg_column : str, optional
+        Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
+        Defaults to summing the lengths of intersected lines per grid cell.
+    agg_function : str, optional
+        Aggregation method for combining values in each grid cell. Options include:
+        - 'sum' (default): Sums all line values.
+        - 'max': Takes the maximum value.
+        - 'min': Takes the minimum value.
+        - 'std': Computes the standard deviation.
+    attr_field : str, optional
+        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
+    output_directory : str, optional
+        Directory where the output netCDF file will be saved. Default is None.
+    output_filename : str, optional
+        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
+    normalize_by_area : bool, optional
+        If True, normalizes the variable in each grid cell by the area of the grid cell (e.g., converts to value per square meter). Default is False.
+    zero_is_value : bool, optional
+        If True, treats zero values as valid data rather than as no-data. Default is False.
+    verbose : bool, optional
+        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+
+    Returns
+    -------
+    netCDF file
+        Transformed netCDF file with gridded data derived from the input line data.
+
+    Notes
+    -----
+    - The function supports input in the form of a shapefile or GeoDataFrame containing line data.
+    - Line lengths are calculated and aggregated based on the specified `agg_column` and `agg_function`.
+    - If lines intersect a grid boundary, their contributions are divided proportionally among the intersected grid cells.
+    - The function creates a netCDF file, where data variables are aggregated and stored with metadata.
+    """
+
+    if lines_gdf is None and shapefile_path is None:
+        raise ValueError("Either 'lines geodataframe' or 'shapefile directory' must be provided.")
+    elif lines_gdf is not None and shapefile_path is not None:
+        raise ValueError("Only one of 'lines geodataframe' or 'shapefile directory' should be provided.")
+
+    # create gridded polygon
+    polygons_gdf = create.create_gridded_polygon(resolution=resolution, out_polygon_path=None, grid_area=False)
+    
+    # spatial join
+    if shapefile_path:
+        lines_gdf = gpd.read_file(shapefile_path)
+    
+    if attr_field is not None:
+        unique_rows = lines_gdf[attr_field].unique().tolist()
+        dataset_list = []
+        
+        for filter_var in unique_rows:
+            # Filter the GeoDataFrame
+            filtered_gdf = lines_gdf[lines_gdf[attr_field] == filter_var].copy()
+            joined_gdf = utils.line_intersect(polygons_gdf, filtered_gdf, agg_column=agg_column, agg_function=agg_function)
+
+            # Determine agg_column, long_name, and units for the current iteration
+            current_agg_column = agg_column or f"length_{agg_function.lower()}"
+            current_long_name = utils.reverse_replace_special_characters(filter_var)
+            current_units = utils.determine_units_line(units, normalize_by_area)
+
+            # Convert joined GeoDataFrame to xarray dataset
+            ds_var = utils.gridded_poly_2_xarray(
+                polygon_gdf=joined_gdf,
+                grid_value=current_agg_column,
+                long_name=current_long_name,
+                units=current_units,
+                source=source,
+                time=time,
+                resolution=resolution,
+                variable_name=filter_var,
+                normalize_by_area=normalize_by_area,
+                zero_is_value=zero_is_value
+            )
+
+            # Print or process verbose information
+            if verbose:
+                global_summary_stats = utils.dataframe_stats_line(dataframe=filtered_gdf, agg_column=agg_column, agg_function=agg_function)
+                print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km.")
+                var_name = utils.replace_special_characters(filter_var)
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, normalize_by_area=normalize_by_area, resolution=resolution) * 1e-3
+                print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km.")
+
+            print("\n")
+            dataset_list.append(ds_var)
+        
+        # Merge all datasets from different filtered GeoDataFrames
+        ds = xr.merge(dataset_list)
+        
+    else:
+        joined_gdf = utils.line_intersect(polygons_gdf, lines_gdf, agg_column=agg_column, agg_function=agg_function)
+
+        # Determine agg_column, long_name, and units
+        agg_column = agg_column or "length_m"
+        long_name = utils.determine_long_name_line(long_name, agg_column, variable_name)
+        units = utils.determine_units_line(units, normalize_by_area)
+        ds = utils.gridded_poly_2_xarray(
+            polygon_gdf=joined_gdf,
+            grid_value=agg_column,
+            long_name=long_name,
+            units=units,
+            source=source,
+            time=time,
+            resolution=resolution,
+            variable_name=variable_name,
+            normalize_by_area=normalize_by_area,
+            zero_is_value=zero_is_value
+        )
+        
+        if verbose:
+            if agg_column == "length_m":
+                global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, agg_column=agg_column, agg_function=agg_function)
+                print(f"Global stats before gridding : {global_summary_stats:.2f} km.")
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, agg_column=agg_column, normalize_by_area=normalize_by_area, resolution=resolution) * 1e-3
+                print(f"Global stats after gridding: {global_gridded_stats:.2f} km.")
+            else:
+                global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, agg_column=agg_column, agg_function=agg_function)
+                print(f"Global stats before gridding : {global_summary_stats:.2f}.")
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, agg_column=agg_column, normalize_by_area=normalize_by_area, resolution=resolution)
+                print(f"Global stats after gridding: {global_gridded_stats:.2f}.")
+    
+    # save the xarray dataset
+    if output_directory:
+        if shapefile_path:
+            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
+        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
+    return ds
+
+def poly_2_grid(poly_gdf=None, variable_name='variable', long_name='variable', units="m2/grid-cell", source=None, time=None, 
+                 resolution=1, attr_field=None, shapefile_path=None, fraction=False, agg_function="sum", output_directory=None, 
+                 output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+
+    """
+    Converts polygon data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
+
+    Parameters
+    ----------
+    poly_gdf : GeoDataFrame, optional
+        GeoDataFrame containing polygon data to be gridded. If not provided, `shapefile_path` must be specified.
+    shapefile_path : str, optional
+        Path to a shapefile containing polygon data.
+    variable_name : str, optional
+        Name of the variable to include in the netCDF attributes metadata. Defaults to:
+        - The unique entries in the `attr_field` column if specified.
+        - The input filename without extension if `attr_field` and `variable_name` are not specified.
+    long_name : str, optional
+        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
+        `attr_field` is specified. Defaults to the input filename without extension if unspecified.
+    units : str, optional
+        Units of the data variable to include in the netCDF metadata. Default is "m2/grid-cell".
+    source : str, optional
+        String describing the original source of the input data. This will be added to the netCDF metadata.
+    time : str, optional
+        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
+        value provided. Default is None (spatial, 2D netCDF output).
+    resolution : float, optional
+        Desired resolution for the grid cells in the output dataset. Default is 1 degree.
+    attr_field : str, optional
+        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
+    fraction : bool, optional
+        If True, calculates the fraction of each polygon within each grid cell. The output values will range from 0 to 1.
+        Default is False.
+    agg_function : str, optional
+        Aggregation method for combining values in each grid cell. Default is 'sum'. Options include:
+        - 'sum': Sum of values.
+        - 'max': Maximum value.
+        - 'min': Minimum value.
+        - 'std': Standard deviation.
+    output_directory : str, optional
+        Directory where the output netCDF file will be saved. Default is None.
+    output_filename : str, optional
+        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
+    normalize_by_area : bool, optional
+        If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
+    zero_is_value : bool, optional
+        If True, treats zero values as valid data rather than as no-data. Default is False.
+    verbose : bool, optional
+        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+
+    Returns
+    -------
+    netCDF file
+        Transformed netCDF file with gridded data derived from the input polygon data.
+
+    Notes
+    -----
+    - The function supports input in the form of a shapefile or GeoDataFrame containing polygon data.
+    - Polygon areas are calculated and aggregated based on the specified `attr_field` and `agg_function`.
+    - If the `fraction` parameter is True, the fraction of each polygon in each grid cell will be computed, with values ranging from 0 to 1.
+    - The function creates a netCDF file, where data variables are aggregated and stored with metadata.
+
+    """
+
+    if poly_gdf is None and shapefile_path is None:
+        raise ValueError("Either 'polygons geodataframe' or 'shapefile directory' must be provided.")
+    elif poly_gdf is not None and shapefile_path is not None:
+        raise ValueError("Only one of 'polygons geodataframe' or 'shapefile directory' should be provided.")
+
+    if shapefile_path:
+        poly_gdf = gpd.read_file(shapefile_path)
+
+    # create gridded polygon
+    polygons_gdf = create.create_gridded_polygon(resolution=resolution, out_polygon_path=None, grid_area=False)
+    
+    if attr_field is not None:
+        unique_rows = poly_gdf[attr_field].unique().tolist()
+        dataset_list = []
+        
+        for filter_var in unique_rows:
+            
+            # Filter the GeoDataFrame
+            filtered_gdf = poly_gdf[poly_gdf[attr_field] == filter_var].copy()
+            # Reset the index to ensure sequential indexing
+            filtered_gdf.reset_index(drop=True, inplace=True)
+
+            # Determine agg_column, long_name, and units for the current iteration
+            grid_value = "frac" if fraction else "in_area"
+            current_long_name = utils.reverse_replace_special_characters(filter_var)
+            current_units = utils.determine_units_poly(units, normalize_by_area, fraction)
+
+            # Convert GeoDataFrame to xarray dataset
+            ds_var = utils.poly_intersect(poly_gdf=filtered_gdf,
+                                            polygons_gdf=polygons_gdf, 
+                                            variable_name=filter_var, 
+                                            long_name=current_long_name,
+                                            units=current_units,
+                                            source=source,
+                                            time=time,
+                                            resolution=resolution,
+                                            agg_function=agg_function, 
+                                            fraction=fraction,
+                                            normalize_by_area=normalize_by_area,
+                                            zero_is_value=zero_is_value)
+
+            # Print or process verbose information
+            if verbose:
+                global_summary_stats = utils.dataframe_stats_poly(dataframe=filtered_gdf, agg_function=agg_function)
+                print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km2.")
+                filter_var = utils.replace_special_characters(filter_var)
+                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=filter_var, agg_column=grid_value,
+                                                              normalize_by_area=True, resolution=resolution) * 1e-6
+                print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km2.")
+
+            print("\n")
+            dataset_list.append(ds_var)
+        
+        # Merge all datasets from different filtered GeoDataFrames
+        ds = xr.merge(dataset_list)
+        
+    else:
+        
+        # Determine agg_column, long_name, and units
+        grid_value = "frac" if fraction else "in_area"
+        long_name = utils.determine_long_name_poly(variable_name, long_name, agg_function)
+        units = utils.determine_units_poly(units, normalize_by_area, fraction)
+        
+        # Convert GeoDataFrame to xarray dataset
+        ds = utils.poly_intersect(poly_gdf=poly_gdf,
+                                        polygons_gdf=polygons_gdf, 
+                                        variable_name=variable_name, 
+                                        long_name=long_name,
+                                        units=units,
+                                        source=source,
+                                        time=time,
+                                        resolution=resolution,
+                                        agg_function=agg_function, 
+                                        fraction=fraction,
+                                        normalize_by_area=normalize_by_area,
+                                        zero_is_value=zero_is_value)
+
+        if verbose:
+            global_summary_stats = utils.dataframe_stats_poly(dataframe=poly_gdf, agg_function=agg_function)
+            print(f"Global stats before gridding : {global_summary_stats:.2f} km2.")
+            variable_name = utils.replace_special_characters(variable_name)
+            if fraction:
+                normalize_by_area = True
+            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, agg_column=grid_value,
+                                                              normalize_by_area=normalize_by_area, resolution=resolution) * 1e-6
+            print(f"Global stats after gridding: {global_gridded_stats:.2f} km2.")
+    
+    # save the xarray dataset
+    if output_directory:
+        if shapefile_path:
+            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
+        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
+    return ds  
+
+def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, resolution=1, netcdf_variable=None, output_directory=None, 
+                 output_filename=None, padding="symmetric", zero_is_value=False, normalize_by_area=False, verbose=False):  
+
+    """
+    Converts raster data (TIFF or netCDF) into a re-gridded xarray dataset.
+
+    Parameters
+    ----------
+    raster_path : str
+        Path to the input raster data file. This can be either a TIFF or netCDF file.
+    agg_function : str
+        Aggregation method to apply when re-gridding. Supported values are 'SUM', 'MEAN', or 'MAX'.
+    variable_name : str
+        Name of the variable to include in the output dataset.
+    long_name : str
+        Descriptive name for the variable.
+    units : str, optional
+        Units for the variable. Default is "value/grid-cell".
+    source : str, optional
+        Source information for the dataset. Default is None.
+    time : str or None, optional
+        Time stamp or identifier for the data. Default is None.
+    resolution : int or float, optional
+        Desired resolution of the grid cells in degree in the output dataset. Default is 1.
+    netcdf_variable : str, optional
+        Name of the variable to extract from the netCDF file, if applicable. Required for netCDF inputs.
+    output_directory : str, optional
+        Directory where the output netCDF file will be saved. Default is None.
+    output_filename : str, optional
+        Filename for the output netCDF file. Default is None.
+    padding : str, optional
+        Padding strategy ('symmetric' or 'end').
+    zero_is_value : bool, optional
+        Whether to treat zero values as valid data rather than as no-data. Default is False.
+    normalize_by_area : bool, optional
+        Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
+    verbose : bool, optional
+        If True, prints the global sum of values before and after re-gridding. Default is False.
+
+    Returns
+    -------
+    xarray.Dataset
+        Re-gridded xarray dataset containing the processed raster data.
+
+    Notes
+    -----
+    This function supports raster data in TIFF or netCDF format and performs re-gridding based on 
+    the specified `agg_function`. The output dataset will include metadata such as the variable name, 
+    long name, units, and optional source and time information.
+    """
+
+    # Determine the file extension
+    file_extension = os.path.splitext(raster_path)[1]
+
+    if file_extension == ".tif":
+        print("Reading the tif file.")
+        # Convert TIFF data to a re-gridded dataset
+        ds = utils.tif_2_ds(input_raster=raster_path, agg_function=agg_function, variable_name=variable_name, 
+                      long_name=long_name, units=units, source=source, resolution=resolution, time=time, padding=padding,
+                      zero_is_value=zero_is_value, normalize_by_area=normalize_by_area, verbose=verbose)
+    
+    elif file_extension == ".nc" or file_extension == ".nc4":
+        # Convert netCDF to TIFF
+        print("Reading the nc file.")
+        netcdf_tif_path = utils.netcdf_2_tif(netcdf_path=raster_path, netcdf_variable=netcdf_variable, time=time)
+        # Convert netCDF data to a re-gridded dataset
+        ds = utils.tif_2_ds(input_raster=netcdf_tif_path, agg_function=agg_function, variable_name=variable_name, 
+                      long_name=long_name, units=units, source=source, resolution=resolution, time=time, padding=padding,
+                      zero_is_value=zero_is_value, normalize_by_area=normalize_by_area, verbose=verbose)
+    else:
+        # Print an error message for unrecognized file types
+        print("Error: File type is not recognized. File type should be either TIFF or netCDF file.")
+
+    # save the xarray dataset
+    if output_directory:
+        if raster_path:
+            base_filename = os.path.splitext(os.path.basename(raster_path))[0]
+        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
+    print("Re-gridding completed!")
+    return ds
+   
 def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_file_path=None, input_ds=None,
                  input_df=None, variable_name=None, long_name=None, units="value/grid-cell", source=None,
-                 time=None, output_directory=None, output_filename=None, zero_is_value=None, value_per_grid=None, verbose=False):
+                 time=None, output_directory=None, output_filename=None, zero_is_value=None, normalize_by_area=None, verbose=False):
     """
     Convert tabular data to a gridded dataset by spatially distributing values based on a NetCDF variable and a tabular column.
 
@@ -58,8 +605,8 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     zero_is_value: str, optional
         If the value is “yes”, then the function will treat zero as an existent value and 0 values will be
         considered while calculating mean and STD.
-    value_per_sqm : float, optional
-        if input “yes” then the value will be transformed into “value m-2”.
+    normalize_by_area : float, optional
+        Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
     verbose: bool, optional
         If “yes”, the global gridded sum of before and after re-gridding operation will be printed. If any
         jurisdiction where surrogate variable is missing and tabular data is evenly distributed over the
@@ -85,18 +632,18 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         long_name = variable_name if variable_name is not None else tabular_column
 
     # check the netcdf resolution
-    cell_size = abs(float(input_ds['lat'].diff('lat').values[0]))
-    cell_size_str = str(cell_size)
+    resolution = abs(float(input_ds['lat'].diff('lat').values[0]))
+    resolution_str = str(resolution)
 
     if time:
         # check and convert ISO3 based on occupation or previous control, given a specific year
         input_df = utils.convert_iso3_by_year(df=input_df, year=time)
 
     # check and print dataframe's iso3 with country fraction dataset
-    utils.check_iso3_with_country_ds(input_df, cell_size_str)
+    utils.check_iso3_with_country_ds(input_df, resolution_str)
   
     base_directory = os.path.dirname(os.path.abspath(__file__))
-    if cell_size_str == "1" or cell_size_str == "1.0":
+    if resolution_str == "1" or resolution_str == "1.0":
         country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
         # Remove surrogate variable if land_frac is 0
         # grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
@@ -106,12 +653,12 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         input_ds = input_ds.copy()
         input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
 
-    elif cell_size_str == "0.5":
+    elif resolution_str == "0.5":
         country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
         input_ds = input_ds.copy()
         input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
         
-    elif cell_size_str == "0.25":
+    elif resolution_str == "0.25":
         country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
         input_ds = input_ds.copy()
         input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
@@ -128,20 +675,15 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
 
     da = xr.DataArray(a, coords={'lat': input_ds['lat'], 'lon': input_ds['lon']}, dims=['lat', 'lon'])
 
-    # # TODO: move verbose to after creating dataset
-    # if verbose:
-    #     print(f"Global sum of jurisdictional dataset : {input_df[[tabular_column]].sum().item()}")
-    #     print(f"Global sum of gridded dataset : {da.sum().item()}\n")
-
     if units == 'value/grid-cell':
         units = 'value m-2'
 
-    ds = utils.da_to_ds(da, variable_name, long_name, units, source=source, time=time, cell_size=cell_size,
-                        zero_is_value=zero_is_value, value_per_area=value_per_grid)
+    ds = utils.da_to_ds(da, variable_name, long_name, units, source=source, time=time, resolution=resolution,
+                        zero_is_value=zero_is_value, normalize_by_area=normalize_by_area)
     
     if verbose:
         print(f"Global sum of jurisdictional dataset : {input_df[[tabular_column]].sum().item()}")
-        global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=None, value_per_area=value_per_grid, cell_size=cell_size)
+        global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, agg_column=None, normalize_by_area=normalize_by_area, resolution=resolution)
         print(f"Global stats after gridding: {global_gridded_stats:.2f}")
 
     # save the xarray dataset
@@ -152,563 +694,60 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
 
     return ds
 
-
-
-def grid_2_grid(raster_path, fold_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, cell_size=1, netcdf_variable=None, output_directory=None, 
-                 output_filename=None, padding="symmetric", zero_is_value=False, value_per_grid=False, verbose=False):  
-
+def get_netcdf_info(netcdf_path, variable_name=None):
     """
-    Converts raster data (TIFF or netCDF) into a re-gridded xarray dataset.
+    Extract information about variables and dimensions from a NetCDF dataset.
 
     Parameters
     ----------
-    raster_path : str
-        Path to the input raster data file. This can be either a TIFF or netCDF file.
-    fold_function : str
-        Aggregation method to apply when re-gridding. Supported values are 'SUM', 'MEAN', or 'MAX'.
-    variable_name : str
-        Name of the variable to include in the output dataset.
-    long_name : str
-        Descriptive name for the variable.
-    units : str, optional
-        Units for the variable. Default is "value/grid-cell".
-    source : str, optional
-        Source information for the dataset. Default is None.
-    time : str or None, optional
-        Time stamp or identifier for the data. Default is None.
-    cell_size : int or float, optional
-        Desired size of the grid cells in the output dataset. Default is 1.
-    netcdf_variable : str, optional
-        Name of the variable to extract from the netCDF file, if applicable. Required for netCDF inputs.
-    output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
-    output_filename : str, optional
-        Filename for the output netCDF file. Default is None.
-    padding : str, optional
-        Padding strategy ('symmetric' or 'end').
-    zero_is_value : bool, optional
-        Whether to treat zero values as valid data rather than as no-data. Default is False.
-    value_per_grid : bool, optional
-        Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
-    verbose : bool, optional
-        If True, prints the global sum of values before and after re-gridding. Default is False.
-
-    Returns
-    -------
-    xarray.Dataset
-        Re-gridded xarray dataset containing the processed raster data.
-
-    Notes
-    -----
-    This function supports raster data in TIFF or netCDF format and performs re-gridding based on 
-    the specified `fold_function`. The output dataset will include metadata such as the variable name, 
-    long name, units, and optional source and time information.
-    """
-
-    # Determine the file extension
-    file_extension = os.path.splitext(raster_path)[1]
-
-    if file_extension == ".tif":
-        print("Reading the tif file.")
-        # Convert TIFF data to a re-gridded dataset
-        ds = utils.tif_2_ds(input_raster=raster_path, fold_function=fold_function, variable_name=variable_name, 
-                      long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, padding=padding,
-                      zero_is_value=zero_is_value, value_per_area=value_per_grid, verbose=verbose)
-    
-    elif file_extension == ".nc" or file_extension == ".nc4":
-        # Convert netCDF to TIFF
-        print("Reading the nc file.")
-        netcdf_tif_path = utils.netcdf_2_tif(netcdf_path=raster_path, netcdf_variable=netcdf_variable, time=time)
-        # Convert netCDF data to a re-gridded dataset
-        ds = utils.tif_2_ds(input_raster=netcdf_tif_path, fold_function=fold_function, variable_name=variable_name, 
-                      long_name=long_name, units=units, source=source, cell_size=cell_size, time=time, padding=padding,
-                      zero_is_value=zero_is_value, value_per_area=value_per_grid, verbose=verbose)
-    else:
-        # Print an error message for unrecognized file types
-        print("Error: File type is not recognized. File type should be either TIFF or netCDF file.")
-
-    # save the xarray dataset
-    if output_directory:
-        if raster_path:
-            base_filename = os.path.splitext(os.path.basename(raster_path))[0]
-        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
-    print("Re-gridding completed!")
-    return ds
-
-
-def poly_2_grid(poly_gdf=None, variable_name=None, long_name=None, units="m2/grid-cell", source=None, time=None, 
-                 cell_size=1, attr_field=None, shapefile_path=None, fraction=False, fold_function="sum", output_directory=None, 
-                 output_filename=None, value_per_grid=False, zero_is_value=False, verbose=False):
-
-    """
-    Converts polygon data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
-
-    Parameters
-    ----------
-    poly_gdf : GeoDataFrame, optional
-        GeoDataFrame containing polygon data to be gridded. If not provided, `shapefile_path` must be specified.
-    shapefile_path : str, optional
-        Path to a shapefile containing polygon data.
+    netcdf_path : str
+        The file path to the NetCDF dataset.
     variable_name : str, optional
-        Name of the variable to include in the netCDF attributes metadata. Defaults to:
-        - The unique entries in the `attr_field` column if specified.
-        - The input filename without extension if `attr_field` and `variable_name` are not specified.
-    long_name : str, optional
-        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
-        `attr_field` is specified. Defaults to the input filename without extension if unspecified.
-    units : str, optional
-        Units of the data variable to include in the netCDF metadata. Default is "m2/grid-cell".
-    source : str, optional
-        String describing the original source of the input data. This will be added to the netCDF metadata.
-    time : str, optional
-        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
-        value provided. Default is None (spatial, 2D netCDF output).
-    cell_size : float, optional
-        Desired resolution for the grid cells in the output dataset. Default is 1.0.
-    attr_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
-    fraction : bool, optional
-        If True, calculates the fraction of each polygon within each grid cell. The output values will range from 0 to 1.
-        Default is False.
-    fold_function : str, optional
-        Aggregation method for combining values in each grid cell. Default is 'sum'. Options include:
-        - 'sum': Sum of values.
-        - 'max': Maximum value.
-        - 'min': Minimum value.
-        - 'std': Standard deviation.
-    output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
-    output_filename : str, optional
-        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
-    value_per_grid : bool, optional
-        If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
-    zero_is_value : bool, optional
-        If True, treats zero values as valid data rather than as no-data. Default is False.
-    verbose : bool, optional
-        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+        The prefix or complete name of the variable to filter. If not provided, all variables are included.
 
     Returns
     -------
-    netCDF file
-        Transformed netCDF file with gridded data derived from the input polygon data.
-
-    Notes
-    -----
-    - The function supports input in the form of a shapefile or GeoDataFrame containing polygon data.
-    - Polygon areas are calculated and aggregated based on the specified `attr_field` and `fold_function`.
-    - If the `fraction` parameter is True, the fraction of each polygon in each grid cell will be computed, with values ranging from 0 to 1.
-    - The function creates a netCDF file, where data variables are aggregated and stored with metadata.
-
+    tuple
+        A tuple containing lists of dimensions, short names, long names, units, & time values (if 'time' exists).
     """
 
-    if poly_gdf is None and shapefile_path is None:
-        raise ValueError("Either 'polygons geodataframe' or 'shapefile directory' must be provided.")
-    elif poly_gdf is not None and shapefile_path is not None:
-        raise ValueError("Only one of 'polygons geodataframe' or 'shapefile directory' should be provided.")
+    netcdf_info = get.get_netcdf_info(netcdf_path=netcdf_path, variable_name=variable_name)
+    return netcdf_info
 
-    if shapefile_path:
-        poly_gdf = gpd.read_file(shapefile_path)
-
-    # create gridded polygon
-    polygons_gdf = create.create_gridded_polygon(cell_size=cell_size, out_polygon_path=None, grid_area=False)
-    
-    if attr_field is not None:
-        unique_rows = poly_gdf[attr_field].unique().tolist()
-        dataset_list = []
-        
-        for filter_var in unique_rows:
-            
-            # Filter the GeoDataFrame
-            filtered_gdf = poly_gdf[poly_gdf[attr_field] == filter_var].copy()
-            # Reset the index to ensure sequential indexing
-            filtered_gdf.reset_index(drop=True, inplace=True)
-
-            # Determine fold_field, long_name, and units for the current iteration
-            grid_value = "frac" if fraction else "in_area"
-            current_long_name = utils.reverse_replace_special_characters(filter_var)
-            current_units = utils.determine_units_poly(units, value_per_grid, fraction)
-
-            # Convert GeoDataFrame to xarray dataset
-            ds_var = utils.poly_intersect(poly_gdf=filtered_gdf,
-                                            polygons_gdf=polygons_gdf, 
-                                            variable_name=filter_var, 
-                                            long_name=current_long_name,
-                                            units=current_units,
-                                            source=source,
-                                            time=time,
-                                            cell_size=cell_size,
-                                            fold_function=fold_function, 
-                                            fraction=fraction,
-                                            value_per_area=value_per_grid,
-                                            zero_is_value=zero_is_value)
-
-            # Print or process verbose information
-            if verbose:
-                global_summary_stats = utils.dataframe_stats_poly(dataframe=filtered_gdf, fold_function=fold_function)
-                print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km2.")
-                filter_var = utils.replace_special_characters(filter_var)
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=filter_var, fold_field=grid_value,
-                                                              value_per_area=True, cell_size=cell_size) * 1e-6
-                print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km2.")
-
-            print("\n")
-            dataset_list.append(ds_var)
-        
-        # Merge all datasets from different filtered GeoDataFrames
-        ds = xr.merge(dataset_list)
-        
-    else:
-        
-        # Determine fold_field, long_name, and units
-        grid_value = "frac" if fraction else "in_area"
-        long_name = utils.determine_long_name_poly(variable_name, long_name, fold_function)
-        units = utils.determine_units_poly(units, value_per_grid, fraction)
-        
-        # Convert GeoDataFrame to xarray dataset
-        ds = utils.poly_intersect(poly_gdf=poly_gdf,
-                                        polygons_gdf=polygons_gdf, 
-                                        variable_name=variable_name, 
-                                        long_name=long_name,
-                                        units=units,
-                                        source=source,
-                                        time=time,
-                                        cell_size=cell_size,
-                                        fold_function=fold_function, 
-                                        fraction=fraction,
-                                        value_per_area=value_per_grid,
-                                        zero_is_value=zero_is_value)
-
-        if verbose:
-            global_summary_stats = utils.dataframe_stats_poly(dataframe=poly_gdf, fold_function=fold_function)
-            print(f"Global stats before gridding : {global_summary_stats:.2f} km2.")
-            variable_name = utils.replace_special_characters(variable_name)
-            if fraction:
-                value_per_grid = True
-            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=grid_value,
-                                                              value_per_area=value_per_grid, cell_size=cell_size) * 1e-6
-            print(f"Global stats after gridding: {global_gridded_stats:.2f} km2.")
-    
-    # save the xarray dataset
-    if output_directory:
-        if shapefile_path:
-            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
-        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
-    return ds  
-  
-    
-    
-def line_2_grid(lines_gdf=None, variable_name=None, long_name=None, units="meter/grid-cell", source=None, time=None, 
-                 cell_size=1, fold_field=None, fold_function="sum", attr_field=None, shapefile_path=None, 
-                 output_directory=None, output_filename=None, value_per_grid=False, zero_is_value=False, verbose=False):
-    
+def country_2_iso3(df, column):
     """
-    Converts line data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
+    Convert country names in a DataFrame column to their corresponding ISO3 country codes.
 
-    Parameters
-    ----------
-    lines_gdf : GeoDataFrame, optional
-        GeoDataFrame containing line data to be gridded. If not provided, `shapefile_path` must be specified.
-    shapefile_path : str, optional
-        Path to a shapefile containing line data, where the units of the data at each line are the same 
-        (e.g., road width in meters).
-    variable_name : str, optional
-        Name of the variable to include in the netCDF attributes metadata. Defaults to:
-        - The unique entries in the `attr_field` column if specified.
-        - The input filename without extension if `attr_field` and `variable_name` are not specified.
-    long_name : str, optional
-        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
-        `attr_field` is specified. Defaults to the input filename without extension if unspecified.
-    units : str, optional
-        Units of the data variable to include in the netCDF metadata. Default is "meter/grid-cell".
-    source : str, optional
-        String describing the original source of the input data. This will be added to the netCDF metadata.
-    time : str, optional
-        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
-        value provided. Default is None (spatial, 2D netCDF output).
-    cell_size : float, optional
-        Desired resolution for the grid cells in the output dataset. Default is 1.0.
-    fold_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
-        Defaults to summing the lengths of intersected lines per grid cell.
-    fold_function : str, optional
-        Aggregation method for combining values in each grid cell. Options include:
-        - 'sum' (default): Sums all line values.
-        - 'max': Takes the maximum value.
-        - 'min': Takes the minimum value.
-        - 'std': Computes the standard deviation.
-    attr_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
-    output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
-    output_filename : str, optional
-        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
-    value_per_grid : bool, optional
-        If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
-    zero_is_value : bool, optional
-        If True, treats zero values as valid data rather than as no-data. Default is False.
-    verbose : bool, optional
-        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+    This function reads a JSON file containing country names and their corresponding ISO3 codes, then 
+    maps the values from the specified column in the DataFrame to their ISO3 codes based on the JSON data. 
+    The resulting ISO3 codes are added as a new column named 'ISO3'.
 
-    Returns
-    -------
-    netCDF file
-        Transformed netCDF file with gridded data derived from the input line data.
+    Args:
+        df (pandas.DataFrame): The DataFrame containing a column with country names.
+        column (str): The name of the column in the DataFrame that contains country names.
 
-    Notes
-    -----
-    - The function supports input in the form of a shapefile or GeoDataFrame containing line data.
-    - Line lengths are calculated and aggregated based on the specified `fold_field` and `fold_function`.
-    - If lines intersect a grid boundary, their contributions are divided proportionally among the intersected grid cells.
-    - The function creates a netCDF file, where data variables are aggregated and stored with metadata.
+    Returns:
+        pandas.DataFrame: The original DataFrame with an additional 'ISO3' column containing the ISO3 country codes.
+
+    Raises:
+        FileNotFoundError: If the JSON file containing country mappings cannot be found.
+        KeyError: If the specified column is not present in the DataFrame.
     """
 
-    if lines_gdf is None and shapefile_path is None:
-        raise ValueError("Either 'lines geodataframe' or 'shapefile directory' must be provided.")
-    elif lines_gdf is not None and shapefile_path is not None:
-        raise ValueError("Only one of 'lines geodataframe' or 'shapefile directory' should be provided.")
-
-    # create gridded polygon
-    polygons_gdf = create.create_gridded_polygon(cell_size=cell_size, out_polygon_path=None, grid_area=False)
-    
-    # spatial join
-    if shapefile_path:
-        lines_gdf = gpd.read_file(shapefile_path)
-    
-    if attr_field is not None:
-        unique_rows = lines_gdf[attr_field].unique().tolist()
-        dataset_list = []
-        
-        for filter_var in unique_rows:
-            # Filter the GeoDataFrame
-            filtered_gdf = lines_gdf[lines_gdf[attr_field] == filter_var].copy()
-            joined_gdf = utils.line_intersect(polygons_gdf, filtered_gdf, fold_field=fold_field, fold_function=fold_function)
-
-            # Determine fold_field, long_name, and units for the current iteration
-            current_fold_field = fold_field or f"length_{fold_function.lower()}"
-            current_long_name = utils.reverse_replace_special_characters(filter_var)
-            current_units = utils.determine_units_line(units, value_per_grid)
-
-            # Convert joined GeoDataFrame to xarray dataset
-            ds_var = utils.gridded_poly_2_xarray(
-                polygon_gdf=joined_gdf,
-                grid_value=current_fold_field,
-                long_name=current_long_name,
-                units=current_units,
-                source=source,
-                time=time,
-                cell_size=cell_size,
-                variable_name=filter_var,
-                value_per_area=value_per_grid,
-                zero_is_value=zero_is_value
-            )
-
-            # Print or process verbose information
-            if verbose:
-                global_summary_stats = utils.dataframe_stats_line(dataframe=filtered_gdf, fold_field=fold_field, fold_function=fold_function)
-                print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f} km.")
-                var_name = utils.replace_special_characters(filter_var)
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_grid, cell_size=cell_size) * 1e-3
-                print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f} km.")
-
-            print("\n")
-            dataset_list.append(ds_var)
-        
-        # Merge all datasets from different filtered GeoDataFrames
-        ds = xr.merge(dataset_list)
-        
-    else:
-        joined_gdf = utils.line_intersect(polygons_gdf, lines_gdf, fold_field=fold_field, fold_function=fold_function)
-
-        # Determine fold_field, long_name, and units
-        fold_field = fold_field or "length_m"
-        long_name = utils.determine_long_name_line(long_name, fold_field, variable_name)
-        units = utils.determine_units_line(units, value_per_grid)
-        ds = utils.gridded_poly_2_xarray(
-            polygon_gdf=joined_gdf,
-            grid_value=fold_field,
-            long_name=long_name,
-            units=units,
-            source=source,
-            time=time,
-            cell_size=cell_size,
-            variable_name=variable_name,
-            value_per_area=value_per_grid,
-            zero_is_value=zero_is_value
-        )
-        
-        if verbose:
-            if fold_field == "length_m":
-                global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, fold_field=fold_field, fold_function=fold_function)
-                print(f"Global stats before gridding : {global_summary_stats:.2f} km.")
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_grid, cell_size=cell_size) * 1e-3
-                print(f"Global stats after gridding: {global_gridded_stats:.2f} km.")
-            else:
-                global_summary_stats = utils.dataframe_stats_line(dataframe=lines_gdf, fold_field=fold_field, fold_function=fold_function)
-                print(f"Global stats before gridding : {global_summary_stats:.2f}.")
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, fold_field=fold_field, value_per_area=value_per_grid, cell_size=cell_size)
-                print(f"Global stats after gridding: {global_gridded_stats:.2f}.")
-    
-    # save the xarray dataset
-    if output_directory:
-        if shapefile_path:
-            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
-        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
-    return ds
-
-
-
-def point_2_grid(points_gdf=None, variable_name=None, long_name=None, units="value/grid-cell", source=None, time=None, 
-                 cell_size=1, fold_field=None, fold_function="sum", attr_field=None, shapefile_path=None, 
-                 output_directory=None, output_filename=None, value_per_grid=False, zero_is_value=False, verbose=False):
-    
-    """
-    Converts point data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
-
-    Parameters
-    ----------
-    points_gdf : GeoDataFrame, optional
-        GeoDataFrame containing point data to be gridded. If not provided, `shapefile_path` must be specified.
-    shapefile_path : str, optional
-        Path to a shapefile containing point data, where the units of the data at each point are the same.
-    variable_name : str, optional
-        Name of the variable to include in the netCDF attributes metadata. Defaults to:
-        - The unique entries in the `attr_field` column if specified.
-        - The input filename without extension if `attr_field` and `variable_name` are not specified.
-    long_name : str, optional
-        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
-        `attr_field` is specified. Defaults to the input filename without extension if unspecified.
-    units : str, optional
-        Units of the data variable to include in the netCDF metadata. Default is "value/grid-cell".
-    source : str, optional
-        String describing the original source of the input data. This will be added to the netCDF metadata.
-    time : str, optional
-        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
-        value provided. Default is None (spatial, 2D netCDF output).
-    cell_size : float, optional
-        Desired resolution for the grid cells in the output dataset. Default is 1.0.
-    fold_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
-        Defaults to counting the number of points per grid cell.
-    fold_function : str, optional
-        Aggregation method for combining values in each grid cell. Options include:
-        - 'sum' (default): Sums all point values.
-        - 'max': Takes the maximum value.
-        - 'min': Takes the minimum value.
-        - 'std': Computes the standard deviation.
-    attr_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
-    output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
-    output_filename : str, optional
-        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
-    value_per_grid : bool, optional
-        If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
-    zero_is_value : bool, optional
-        If True, treats zero values as valid data rather than as no-data. Default is False.
-    verbose : bool, optional
-        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
-
-    Returns
-    -------
-    netCDF file
-        Transformed netCDF file with gridded data derived from the input point data.
-
-    Notes
-    -----
-    - The function supports input in the form of a shapefile or GeoDataFrame containing point data.
-    - If points lie exactly on a grid boundary, they are shifted by 0.0001 degrees in both latitude and longitude to ensure assignment to a grid cell.
-    - The function creates a netCDF file, where data variables are aggregated based on the `fold_field` and `fold_function`.
-    """
-
-    
-    if points_gdf is None and shapefile_path is None:
-        raise ValueError("Either 'points geodataframe' or 'shapefile directory' must be provided.")
-    elif points_gdf is not None and shapefile_path is not None:
-        raise ValueError("Only one of 'points geodataframe' or 'shapefile directory' should be provided.")
-
-    # create gridded polygon
-    polygons_gdf = create.create_gridded_polygon(cell_size=cell_size, out_polygon_path=None, grid_area=False)
-    
-    # spatial join
-    if shapefile_path:
-        points_gdf = gpd.read_file(shapefile_path)
-    
-    if attr_field is not None:
-        unique_rows = points_gdf[attr_field].unique().tolist()
-        dataset_list = []
-        
-        for filter_var in unique_rows:
-            # Filter the GeoDataFrame
-            filtered_gdf = points_gdf[points_gdf[attr_field] == filter_var].copy()
-            joined_gdf = utils.point_spatial_join(polygons_gdf, filtered_gdf, fold_field=fold_field, fold_function=fold_function)
-
-            # Determine fold_field, long_name, and units for the current iteration
-            current_fold_field = fold_field or "count"
-            current_long_name = utils.reverse_replace_special_characters(filter_var)
-            current_units = utils.determine_units_point(units, value_per_grid)
-
-            # Convert joined GeoDataFrame to xarray dataset
-            ds_var = utils.gridded_poly_2_xarray(
-                polygon_gdf=joined_gdf,
-                grid_value=current_fold_field,
-                long_name=current_long_name,
-                units=current_units,
-                source=source,
-                time=time,
-                cell_size=cell_size,
-                variable_name=filter_var,
-                value_per_area=value_per_grid,
-                zero_is_value=zero_is_value
-            )
-
-            # Print or process verbose information
-            if verbose:
-                global_summary_stats = utils.dataframe_stats_point(dataframe=filtered_gdf, fold_field=current_fold_field, fold_function=fold_function)
-                print(f"Global stats of {filter_var} before gridding : {global_summary_stats:.2f}")
-                var_name = utils.replace_special_characters(filter_var)
-                global_gridded_stats = utils.xarray_dataset_stats(dataset=ds_var, variable_name=var_name, value_per_area=value_per_grid, cell_size=cell_size)
-                print(f"Global stats of {filter_var} after gridding: {global_gridded_stats:.2f}")
-
-            print("\n")
-            dataset_list.append(ds_var)
-        
-        # Merge all datasets from different filtered GeoDataFrames
-        ds = xr.merge(dataset_list)
-        
-    else:
-        joined_gdf = utils.point_spatial_join(polygons_gdf, points_gdf, fold_field=fold_field, fold_function=fold_function)
-
-        # Determine fold_field, long_name, and units
-        fold_field = fold_field or "count"
-        long_name = utils.determine_long_name_point(fold_field, variable_name, long_name, fold_function)
-        units = utils.determine_units_point(units, value_per_grid)
-        
-        ds = utils.gridded_poly_2_xarray(
-            polygon_gdf=joined_gdf,
-            grid_value=fold_field,
-            long_name=long_name,
-            units=units,
-            source=source,
-            time=time,
-            cell_size=cell_size,
-            variable_name=variable_name,
-            value_per_area=value_per_grid,
-            zero_is_value=zero_is_value
-        )
-
-        if verbose:
-            global_summary_stats = utils.dataframe_stats_point(dataframe=points_gdf, fold_field=fold_field, fold_function=fold_function)
-            print(f"Global stats before gridding : {global_summary_stats:.2f}")
-            global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, value_per_area=value_per_grid, cell_size=cell_size)
-            print(f"Global stats after gridding: {global_gridded_stats:.2f}")
-    
-    # save the xarray dataset
-    if output_directory:
-        if shapefile_path:
-            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
-        utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
-    return ds
-
+    # Convert country names to ISO3
+    base_directory = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(base_directory, "Names.json")
+    with open(json_path, 'r') as file:
+        country_iso3_data = json.load(file)
+        # Map the "Country" column to the new "ISO3" column
+        df['ISO3'] = df[column].map(country_iso3_data)
+        # Print rows where the specified column has NaN values
+        nan_iso3 = df[df["ISO3"].isna()]
+        iso3_not_found = nan_iso3[column].unique().tolist()
+        # Check if the list is not empty before printing
+        if iso3_not_found:
+            print(f"Country Not Found: {iso3_not_found}")
+    return df
 
 def plot_histogram(variable, dataset=None, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None, netcdf_directory=None):
     
@@ -751,15 +790,14 @@ def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue'
     """
     plot.plot_scatter(variable1, variable2, dataset, dataset2, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename, netcdf_directory, netcdf_directory2)
     
-
-def plot_time_series(variable, dataset=None, fold_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None, netcdf_directory=None):
+def plot_time_series(variable, dataset=None, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None, netcdf_directory=None):
     """
     Create a line plot and/or area plot for a time series data variable.
     
     Parameters:
     - dataset: xarray.Dataset, the dataset containing the variable to plot.
     - variable: str, the name of the variable to plot.
-    - fold_function: str, the operation to apply ('sum', 'mean', 'max', 'std').
+    - agg_function: str, the operation to apply ('sum', 'mean', 'max', 'std').
     - smoothing_window: int, optional, the window size for rolling mean smoothing.
     - plot_type: str, optional, the type of plot ('line', 'area', 'both'). Default is 'both'.
     - color: str, optional, the color of the plot. Default is 'blue'.
@@ -775,8 +813,7 @@ def plot_time_series(variable, dataset=None, fold_function='sum', plot_type='bot
     - None, displays the plot.
     """
     
-    plot.plot_time_series(variable, dataset, fold_function, plot_type, color, plot_label, x_label, y_label, plot_title, smoothing_window, output_dir, filename, netcdf_directory)
-
+    plot.plot_time_series(variable, dataset, agg_function, plot_type, color, plot_label, x_label, y_label, plot_title, smoothing_window, output_dir, filename, netcdf_directory)
 
 def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None, netcdf_directory=None, netcdf_directory2=None):
     
@@ -805,7 +842,6 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     
     plot.plot_hexbin(variable1, variable2, dataset, dataset2, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename, netcdf_directory, netcdf_directory2)
     
-
 def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_min=None, color_max=None, levels=10, output_dir=None, filename=None, netcdf_directory=None):
 
     """
@@ -851,8 +887,7 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_mi
     """
 
     plot.plot_map(variable, dataset, cmap_name=color, title=title, label=label, color_min=color_min, color_max=color_max, levels=levels, output_dir=output_dir, filename=filename, netcdf_directory=netcdf_directory)
-    
-    
+     
 def sum_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
 
     """
@@ -895,8 +930,6 @@ def subtract_variables(variable1, variable2, dataset=None, new_variable_name=Non
     ds = calculate.subtract_variables(variable1, variable2, dataset, new_variable_name, time, netcdf_directory)
     return ds
     
-
-
 def divide_variables(variable1, variable2, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
     """
     Divide one variable by another in the xarray dataset.
@@ -916,7 +949,6 @@ def divide_variables(variable1, variable2, dataset=None, new_variable_name=None,
     ds = calculate.divide_variables(variable1, variable2, dataset, new_variable_name, time, netcdf_directory)
     return ds
     
-
 def multiply_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
     """
     Multiply specified variables in the xarray dataset. If no variables are specified, multiply all variables.
@@ -957,8 +989,7 @@ def average_variables(variables=None, dataset=None, new_variable_name=None, time
     ds = calculate.average_variables(variables, dataset, new_variable_name, time, netcdf_directory)
     return ds
 
-
-def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, cell_size=1, aggregation=None, fold_function='sum', verbose=False, netcdf_path=None):
+def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolution=1, aggregation=None, agg_function='sum', verbose=False, netcdf_path=None):
     """
     Process gridded data from an xarray Dataset to generate tabular data for different jurisdictions.
 
@@ -972,11 +1003,13 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, cell_s
         Variable name to be processed. If None, all variables in the dataset (excluding predefined ones) will be considered.
     time : str, optional
         Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
+    resolution : float, optional
+        Resolution of gridded data in degree. Default is 1 degree.
     grid_area : str, optional
         Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
     aggregation : str, optional
         Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
-    fold_function : str, optional, default 'sum'
+    agg_function : str, optional, default 'sum'
         Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.
 
     Returns:
@@ -986,65 +1019,8 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, cell_s
     """
    
     df = utils.grid_2_table(input_netcdf_path=netcdf_path, ds=dataset, variables=variables, time=time, 
-                           grid_area=grid_area, cell_size=cell_size, aggregation=aggregation, method=fold_function, 
+                           grid_area=grid_area, resolution=resolution, aggregation=aggregation, method=agg_function, 
                            verbose=verbose)
-    return df
-
-
-def get_netcdf_info(netcdf_path, variable_name=None):
-    """
-    Extract information about variables and dimensions from a NetCDF dataset.
-
-    Parameters
-    ----------
-    netcdf_path : str
-        The file path to the NetCDF dataset.
-    variable_name : str, optional
-        The prefix or complete name of the variable to filter. If not provided, all variables are included.
-
-    Returns
-    -------
-    tuple
-        A tuple containing lists of dimensions, short names, long names, units, & time values (if 'time' exists).
-    """
-
-    netcdf_info = get.get_netcdf_info(netcdf_path=netcdf_path, variable_name=variable_name)
-    return netcdf_info
-
-
-def country_2_iso3(df, column):
-    """
-    Convert country names in a DataFrame column to their corresponding ISO3 country codes.
-
-    This function reads a JSON file containing country names and their corresponding ISO3 codes, then 
-    maps the values from the specified column in the DataFrame to their ISO3 codes based on the JSON data. 
-    The resulting ISO3 codes are added as a new column named 'ISO3'.
-
-    Args:
-        df (pandas.DataFrame): The DataFrame containing a column with country names.
-        column (str): The name of the column in the DataFrame that contains country names.
-
-    Returns:
-        pandas.DataFrame: The original DataFrame with an additional 'ISO3' column containing the ISO3 country codes.
-
-    Raises:
-        FileNotFoundError: If the JSON file containing country mappings cannot be found.
-        KeyError: If the specified column is not present in the DataFrame.
-    """
-
-    # Convert country names to ISO3
-    base_directory = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(base_directory, "Names.json")
-    with open(json_path, 'r') as file:
-        country_iso3_data = json.load(file)
-        # Map the "Country" column to the new "ISO3" column
-        df['ISO3'] = df[column].map(country_iso3_data)
-        # Print rows where the specified column has NaN values
-        nan_iso3 = df[df["ISO3"].isna()]
-        iso3_not_found = nan_iso3[column].unique().tolist()
-        # Check if the list is not empty before printing
-        if iso3_not_found:
-            print(f"Country Not Found: {iso3_not_found}")
     return df
 
 def plot_country(column, dataframe=None, title="Map", label=None, color_palette='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None, wrapped_labels=False):
