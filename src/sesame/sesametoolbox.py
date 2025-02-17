@@ -995,8 +995,6 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolu
 
     Parameters:
     -----------
-    netcdf_path : str, optional
-        Netcdf path containing path location. 
     dataset : xarray Dataset, optional
         Gridded dataset containing spatial information.
     variable : str, optional
@@ -1010,8 +1008,9 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolu
     aggregation : str, optional
         Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
     agg_function : str, optional, default 'sum'
-        Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.
-
+        Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.  
+    netcdf_path : str, optional
+        Netcdf path containing path location. 
     Returns:
     --------
     merged_df : pandas DataFrame
@@ -1023,7 +1022,7 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolu
                            verbose=verbose)
     return df
 
-def plot_country(column, dataframe=None, title="Map", label=None, color_palette='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None, wrapped_labels=False):
+def plot_country(column, dataframe=None, title="Map", label=None, color='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None):
     
     """
     Plots a choropleth map of a given column from a dataset, using different classification methods.
@@ -1038,7 +1037,7 @@ def plot_country(column, dataframe=None, title="Map", label=None, color_palette=
         The title of the map.
     label : str, optional
         The label for the colorbar.
-    color_palette : str, default='viridis'
+    color : str, default='viridis'
         The color palette used for visualization. Should be a valid Seaborn palette.
     num_classes : int, default=5
         The number of classification bins for the data.
@@ -1054,8 +1053,6 @@ def plot_country(column, dataframe=None, title="Map", label=None, color_palette=
         The filename for saving the plot.
     csv_path : str, optional
         The path to a CSV file containing the data. Either `df` or `csv_path` must be provided.
-    wrapped_labels : bool, default=False
-        Whether to wrap the labels in the colorbar for better readability.
 
     Raises:
     -------
@@ -1073,4 +1070,4 @@ def plot_country(column, dataframe=None, title="Map", label=None, color_palette=
     None
         Displays the choropleth map using Matplotlib.
     """
-    plot.plot_country(column=column, df=dataframe, title=title, label=label, color_palette=color_palette, num_classes=num_classes, class_type=class_type, output_dir=output_dir, filename=filename, csv_path=csv_path, wrapped_labels=wrapped_labels)
+    plot.plot_country(column=column, df=dataframe, title=title, label=label, color_palette=color, num_classes=num_classes, class_type=class_type, output_dir=output_dir, filename=filename, csv_path=csv_path)

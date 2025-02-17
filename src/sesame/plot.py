@@ -569,7 +569,7 @@ def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', colo
     plt.show()
 
 
-def plot_country(column, df=None, title="Map", label=None, color_palette='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None, wrapped_labels=False):
+def plot_country(column, df=None, title="Map", label=None, color_palette='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None):
     
     if df is None and csv_path is None:
         raise ValueError("Either 'pandas dataframe' or 'csv path' must be provided.")
@@ -638,17 +638,26 @@ def plot_country(column, df=None, title="Map", label=None, color_palette='viridi
     cbar = fig.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.046, pad=0.04)
     cbar.set_label(label, fontsize=12)
 
+    # Modify class range values only while displaying in the color bar
+    colorbar_labels = unique_classes.copy()
+
+    # First class: "< max value of first class"
+    colorbar_labels[0] = f"< {int(class_bins[0])}"  
+
+    # Last class: "> max value of previous class"
+    colorbar_labels[-1] = f"> {int(class_bins[-1])}"
+
+    # For all other classes, use only the max value (upper bound of the class)
+    for i in range(1, len(colorbar_labels) - 1):
+        colorbar_labels[i] = f"{int(class_bins[i])}"  # Keep only the max value
+
     # Setting custom labels without tick marks
     tick_locations = np.linspace(0.5 / num_classes, 1 - 0.5 / num_classes, num_classes)
 
-    if wrapped_labels:
-        # Wrap the labels to fit
-        unique_classes = [label.replace(' - ', ' - \n') for label in unique_classes]
-    
     cbar.set_ticks(tick_locations)
-    cbar.set_ticklabels(unique_classes, fontsize=10)
-    cbar.ax.set_xticklabels(unique_classes, rotation=45)
-    cbar.ax.tick_params(size=0)  
+    cbar.set_ticklabels(colorbar_labels, fontsize=10)
+    cbar.ax.set_xticklabels(colorbar_labels, rotation=0)
+    cbar.ax.tick_params(size=0)
     
     # Add title and save the figure
     plt.title(title, fontsize=14)
