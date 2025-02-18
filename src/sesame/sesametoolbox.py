@@ -570,7 +570,7 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
    
 def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_file_path=None, input_ds=None,
                  input_df=None, variable_name=None, long_name=None, units="value/grid-cell", source=None,
-                 time=None, output_directory=None, output_filename=None, zero_is_value=None, normalize_by_area=None, verbose=False):
+                 time=None, output_directory=None, output_filename=None, zero_is_value=False, normalize_by_area=False, eez=False, verbose=False):
     """
     Convert tabular data to a gridded dataset by spatially distributing values based on a NetCDF variable and a tabular column.
 
@@ -602,13 +602,15 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         Additional name for the output raster file. If None, a default name will be used.
     time : str, optional
         Time information for the dataset.
-    zero_is_value: str, optional
-        If the value is “yes”, then the function will treat zero as an existent value and 0 values will be
+    zero_is_value: bool, optional
+        If the value is True, then the function will treat zero as an existent value and 0 values will be
         considered while calculating mean and STD.
-    normalize_by_area : float, optional
+    normalize_by_area : bool, optional
         Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
+    eez : bool, optional
+        If set to True, the function converts the jurisdictional Exclusive Economic Zone (EEZ) values to a spatial grid.
     verbose: bool, optional
-        If “yes”, the global gridded sum of before and after re-gridding operation will be printed. If any
+        If True, the global gridded sum of before and after re-gridding operation will be printed. If any
         jurisdiction where surrogate variable is missing and tabular data is evenly distributed over the
         jurisdiction, the ISO3 codes of evenly distributed countries will also be printed.
 
@@ -638,32 +640,32 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     if time:
         # check and convert ISO3 based on occupation or previous control, given a specific year
         input_df = utils.convert_iso3_by_year(df=input_df, year=time)
-
-    # check and print dataframe's iso3 with country fraction dataset
-    utils.check_iso3_with_country_ds(input_df, resolution_str)
-  
+    
     base_directory = os.path.dirname(os.path.abspath(__file__))
-    if resolution_str == "1" or resolution_str == "1.0":
-        country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
-        # Remove surrogate variable if land_frac is 0
-        # grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.nc"))
-        # grid_ds["land_frac"] = grid_ds["land_frac"].where(grid_ds["land_frac"] == 0, 1)
-        # input_ds = input_ds.copy()
-        # input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0) * grid_ds["land_frac"]
-        input_ds = input_ds.copy()
-        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
-
-    elif resolution_str == "0.5":
-        country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
-        input_ds = input_ds.copy()
-        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
-        
-    elif resolution_str == "0.25":
-        country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
+    if eez:
+        country_ds = xr.open_dataset(os.path.join(base_directory, "eezs.1deg.nc"))
         input_ds = input_ds.copy()
         input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
     else:
-        raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")
+        # check and print dataframe's iso3 with country fraction dataset
+        utils.check_iso3_with_country_ds(input_df, resolution_str)
+        
+        if resolution_str == "1" or resolution_str == "1.0":
+            country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
+            input_ds = input_ds.copy()
+            input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+
+        elif resolution_str == "0.5":
+            country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
+            input_ds = input_ds.copy()
+            input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+            
+        elif resolution_str == "0.25":
+            country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
+            input_ds = input_ds.copy()
+            input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+        else:
+            raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")
 
     input_ds, country_ds, a = utils.adjust_datasets(input_ds, country_ds, time)
     print(f"Distributing {variable_name} onto {netcdf_variable}.")
