@@ -29,7 +29,7 @@ import opensesame as sm
 SESAME Software package is dependent on multiple python files. Users are requested to download the files from src folder. Software documentation will be available soon.
 
 ## Human-Earth Atlas
-Datasets can be downloaded in NetCDF format from {link}. Detailed dataset documentation file can be found in [Google Spreadsheet](https://docs.google.com/spreadsheets/d/17rn570hyfLm0OsSmbTxHcVGPS4Vy27EpWAI02Rqu-WQ/edit?usp=sharing). 
+Datasets can be downloaded in NetCDF format from {link}. Detailed dataset documentation file can be found in [Google Spreadsheet]. 
 
 ## Contact
 For questions or inquiries about the SESAME project, please contact [abdullah-al.faisal@mail.mcgill.ca](mailto:abdullah-al.faisal@mail.mcgill.ca).
