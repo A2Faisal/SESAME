@@ -641,9 +641,10 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         # check and convert ISO3 based on occupation or previous control, given a specific year
         input_df = utils.convert_iso3_by_year(df=input_df, year=time)
     
-    base_directory = os.path.dirname(os.path.abspath(__file__))
+    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_directory, "data")
     if eez:
-        country_ds = xr.open_dataset(os.path.join(base_directory, "eezs.1deg.nc"))
+        country_ds = xr.open_dataset(os.path.join(data_dir, "eezs.1deg.nc"))
         input_ds = input_ds.copy()
         input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
     else:
@@ -651,17 +652,17 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         utils.check_iso3_with_country_ds(input_df, resolution_str)
         
         if resolution_str == "1" or resolution_str == "1.0":
-            country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
+            country_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.1deg.2000-2023.a.nc"))
             input_ds = input_ds.copy()
             input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
 
         elif resolution_str == "0.5":
-            country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
+            country_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_5deg.2000-2023.a.nc"))
             input_ds = input_ds.copy()
             input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
             
         elif resolution_str == "0.25":
-            country_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
+            country_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_25deg.2000-2023.a.nc"))
             input_ds = input_ds.copy()
             input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
         else:
@@ -737,8 +738,9 @@ def country_2_iso3(df, column):
     """
 
     # Convert country names to ISO3
-    base_directory = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(base_directory, "Names.json")
+    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_directory, "data")
+    json_path = os.path.join(data_dir, "Names.json")
     with open(json_path, 'r') as file:
         country_iso3_data = json.load(file)
         # Map the "Country" column to the new "ISO3" column
@@ -865,8 +867,8 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_mi
         The minimum value for the color scale. If None, the minimum value is determined automatically. Default is None.
     color_max : float or None, optional
         The maximum value for the color scale. If None, the maximum value is determined automatically. Default is None.
-    levels : int, optional
-        Number of levels for the color scale. Default is 10.
+    levels : int or list, optional
+        If int, the number of discrete color levels to create within the color range; if list, the explicit bin edges for color mapping.
     output_dir : str or None, optional
         Directory to save the output plot. If None, the plot is not saved. Default is None.
     filename : str or None, optional
@@ -888,7 +890,7 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_mi
 
     """
 
-    plot.plot_map(variable, dataset, cmap_name=color, title=title, label=label, color_min=color_min, color_max=color_max, levels=levels, output_dir=output_dir, filename=filename, netcdf_directory=netcdf_directory)
+    plot.plot_map(variable, dataset, color=color, title=title, label=label, color_min=color_min, color_max=color_max, levels=levels, output_dir=output_dir, filename=filename, netcdf_directory=netcdf_directory)
      
 def sum_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
 
@@ -1024,52 +1026,32 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolu
                            verbose=verbose)
     return df
 
-def plot_country(column, dataframe=None, title="Map", label=None, color='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None):
+def plot_country(column, dataframe=None, title="Map", label=None, color='viridis', num_classes=5, class_type='geometric', output_dir=None, filename=None, csv_path=None):
     
     """
-    Plots a choropleth map of a given column from a dataset, using different classification methods.
+        Plots a choropleth map with data classified into specified number of classes and displayed according to a chosen classification type.
 
-    Parameters:
-    -----------
-    column : str
-        The name of the column in the dataset to visualize on the map.
-    dataframe : pandas.DataFrame, optional
-        The dataset containing country-level values. Either `df` or `csv_path` must be provided.
-    title : str, default="Map"
-        The title of the map.
-    label : str, optional
-        The label for the colorbar.
-    color : str, default='viridis'
-        The color palette used for visualization. Should be a valid Seaborn palette.
-    num_classes : int, default=5
-        The number of classification bins for the data.
-    class_type : str, default='natural'
-        The classification method to use. Options:
-        - 'natural': Natural Breaks (Jenks)
-        - 'equal': Equal Interval
-        - 'quantiles': Quantiles
-        - 'log10': Log-transformed Natural Breaks
-    output_dir : str, optional
-        The directory where the plot should be saved (if saving is required).
-    filename : str, optional
-        The filename for saving the plot.
-    csv_path : str, optional
-        The path to a CSV file containing the data. Either `df` or `csv_path` must be provided.
+        Parameters:
+        - column (str): The name of the column in the dataframe which contains the data to be classified and plotted.
+        - df (pandas.DataFrame, optional): DataFrame containing the data to plot. If None, data must be provided via csv_path.
+        - title (str): Title for the map.
+        - label (str): Label for the colorbar, describing the data.
+        - color (str): Name of the color palette (from seaborn) to use for coloring the classes.
+        - num_classes (int): The desired number of classes to classify the data into.
+        - class_type (str or list): Specifies the classification strategy. Can be 'equal', 'quantile', 'geometric', 'std' (standard deviation), or directly a list of bin edges for manual classification.
+        - output_dir (str, optional): Directory path to save the output file. If not specified, the map will not be saved.
+        - filename (str, optional): Name of the output file to save the map. If not specified but output_dir is, uses a default filename.
+        - csv_path (str, optional): Path to the CSV file to be read as data if df is not provided. This must be specified if df is None.
 
-    Raises:
-    -------
-    ValueError
-        If neither `df` nor `csv_path` is provided, or if both are provided.
+        Returns:
+        None: Displays and optionally saves the plot. The function directly visualizes the map using matplotlib and does not return any value.
 
-    Notes:
-    ------
-    - The function merges a country-level dataset with a world shapefile and applies classification.
-    - Uses Cartopy and Matplotlib to project and display the map.
-    - Classification methods allow different ways to categorize the data.
+        Raises:
+        - ValueError: If neither df nor csv_path is provided, or if both are provided, or if an invalid class_type is provided.
+        
+        Note:
+        - The function adjusts the colormap dynamically based on the actual number of unique classes that result from the classification method used. This ensures that the colorbar accurately represents the data distribution.
+        - If csv_path is used, the file encoding is first tried with 'utf-8', and if it fails, 'latin1' is used as a fallback.
+        """
 
-    Returns:
-    --------
-    None
-        Displays the choropleth map using Matplotlib.
-    """
-    plot.plot_country(column=column, df=dataframe, title=title, label=label, color_palette=color, num_classes=num_classes, class_type=class_type, output_dir=output_dir, filename=filename, csv_path=csv_path)
+    plot.plot_country(column=column, dataframe=dataframe, title=title, label=label, color=color, num_classes=num_classes, class_type=class_type, output_dir=output_dir, filename=filename, csv_path=csv_path)

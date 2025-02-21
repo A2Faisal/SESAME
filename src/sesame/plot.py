@@ -5,7 +5,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from scipy import stats
 from scipy.stats import linregress
 import matplotlib.colors as mcolors
 import cartopy.crs as ccrs
@@ -17,7 +16,8 @@ import cartopy.crs as ccrs
 from matplotlib.colors import ListedColormap
 import cartopy
 import seaborn as sns
-import mapclassify as mc
+
+import calculate
 
 
 def plot_histogram(variable, dataset=None, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None, netcdf_directory=None):
@@ -44,7 +44,7 @@ def plot_histogram(variable, dataset=None, bin_size=30, color='blue', plot_title
         raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
     
     if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)    
+        dataset = xr.open_dataset(netcdf_directory)    
     
     # Ensure the specified variable is in the dataset
     if variable not in dataset:
@@ -57,12 +57,15 @@ def plot_histogram(variable, dataset=None, bin_size=30, color='blue', plot_title
 
     # Remove outliers if specified
     if remove_outliers:
-        q1 = np.percentile(data, 25)
-        q3 = np.percentile(data, 75)
-        iqr = q3 - q1
-        lower_bound = q1 - 1.5 * iqr
-        upper_bound = q3 + 1.5 * iqr
-        data = data[(data >= lower_bound) & (data <= upper_bound)]
+            # Calculate the mean and standard deviation
+            mean = np.mean(data)
+            std_dev = np.std(data)
+            # Calculate Z-scores
+            z_scores = (data - mean) / std_dev
+            # Define a threshold for Z-score (e.g., 3)
+            threshold = 3
+            # Filter data within the threshold
+            data = data[(np.abs(z_scores) <= threshold)]
 
     # Apply log transformation if specified
     if log_transform:
@@ -115,33 +118,12 @@ def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue'
     Returns:
     - None, displays the plot.
     """
-    '''
-    if dataset is None and netcdf_directory is None:
-        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
-    elif dataset is not None and netcdf_directory is not None:
-        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
     
-    if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
-        
-    if dataset2 is None and netcdf_directory2 is None:
-        raise ValueError("Either 'xarray dataset2' or 'netcdf_directory2' must be provided.")
-    elif dataset2 is not None and netcdf_directory2 is not None:
-        raise ValueError("Only one of 'xarray dataset2' or 'netcdf_directory2' should be provided.")
-    
-    if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory2)
-    
-    # Ensure the specified variable for the x-axis is in the dataset
-    if variable1 not in dataset:
-        raise ValueError(f"Variable '{variable1}' not found in the dataset.")
-
-    '''
     # Check and load dataset for variable1
     if dataset is None and netcdf_directory is None:
         raise ValueError("Either 'dataset' or 'netcdf_directory' must be provided for variable1.")
     elif dataset is None:
-        dataset = xr.load_dataset(netcdf_directory)
+        dataset = xr.open_dataset(netcdf_directory)
     elif netcdf_directory is not None:
         raise ValueError("Only one of 'dataset' or 'netcdf_directory' should be provided for variable1.")
     
@@ -149,7 +131,7 @@ def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue'
     if dataset2 is None and netcdf_directory2 is None:
         dataset2 = dataset  # If no second dataset or directory is provided, use the same dataset
     elif dataset2 is None:
-        dataset2 = xr.load_dataset(netcdf_directory2)
+        dataset2 = xr.open_dataset(netcdf_directory2)
     elif netcdf_directory2 is not None:
         raise ValueError("Only one of 'dataset2' or 'netcdf_directory2' should be provided for variable2.")
     
@@ -211,16 +193,17 @@ def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue'
 
     # Remove outliers if specified
     if remove_outliers:
-        # Remove any infinite or NaN values
-        df = df.replace([np.inf, -np.inf], np.nan).dropna()
-        # calucate z-score
-        z_scores = stats.zscore(df)
+        # Calculate the mean and standard deviation
+        mean = df.mean()
+        std_dev = df.std()
+        # Calculate Z-scores
+        z_scores = (df - mean) / std_dev
         # Define a threshold for Z-score (e.g., 3)
         threshold = 3
-        # Create a boolean mask for outliers
-        outlier_mask = (np.abs(z_scores) < threshold).all(axis=1)
+        # Create a boolean mask for data within the threshold
+        without_outliers = (z_scores.abs() <= threshold).all(axis=1)
         # Filter the DataFrame to remove outliers
-        df = df[outlier_mask]
+        df = df[without_outliers]
         
     # Create the scatter plot
     plt.figure(figsize=(10, 6))
@@ -295,7 +278,7 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
         raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
     
     if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
+        dataset = xr.open_dataset(netcdf_directory)
         
     if dataset2 is None and netcdf_directory2 is None:
         raise ValueError("Either 'xarray dataset2' or 'netcdf_directory2' must be provided.")
@@ -303,7 +286,7 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
         raise ValueError("Only one of 'xarray dataset2' or 'netcdf_directory2' should be provided.")
     
     if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
+        dataset = xr.open_dataset(netcdf_directory)
     
     # Ensure the specified variable for the x-axis is in the dataset
     if variable1 not in dataset:
@@ -360,16 +343,17 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
 
     # Remove outliers if specified
     if remove_outliers:
-        # Remove any infinite or NaN values
-        df = df.replace([np.inf, -np.inf], np.nan).dropna()
-        # calucate z-score
-        z_scores = stats.zscore(df)
+        # Calculate the mean and standard deviation
+        mean = df.mean()
+        std_dev = df.std()
+        # Calculate Z-scores
+        z_scores = (df - mean) / std_dev
         # Define a threshold for Z-score (e.g., 3)
         threshold = 3
-        # Create a boolean mask for outliers
-        outlier_mask = (np.abs(z_scores) < threshold).all(axis=1)
+        # Create a boolean mask for data within the threshold
+        without_outliers = (z_scores.abs() <= threshold).all(axis=1)
         # Filter the DataFrame to remove outliers
-        df = df[outlier_mask]
+        df = df[without_outliers]
         
     # Create the scatter plot
     plt.figure(figsize=(8, 6))
@@ -434,7 +418,7 @@ def plot_time_series(variable, dataset=None, agg_function='sum', plot_type='both
         raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
     
     if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)  
+        dataset = xr.open_dataset(netcdf_directory)  
     
     # Ensure the specified variable is in the dataset
     if variable not in dataset:
@@ -496,9 +480,7 @@ def plot_time_series(variable, dataset=None, agg_function='sum', plot_type='both
     plt.show()
 
 
-def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', color_min=None, color_max=None, levels=10, output_dir=None, filename=None, netcdf_directory=None):
-    
-    
+def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_min=None, color_max=None, levels=10, output_dir=None, filename=None, netcdf_directory=None):
     if dataset is None and netcdf_directory is None:
         raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
     elif dataset is not None and netcdf_directory is not None:
@@ -507,31 +489,30 @@ def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', colo
     if netcdf_directory:
         dataset = xr.load_dataset(netcdf_directory) 
 
-    if color_min is None and color_max is None:
-        color_min = dataset[variable].min().item()
-        color_max = dataset[variable].max().item()
+    if isinstance(levels, list):
+        # Directly use provided levels if it's a list
+        bounds = levels
+        num_levels = len(levels) - 1
+        # Ensure correct number of colors in the colormap
+        cmap_discrete = plt.cm.get_cmap(color, num_levels)
+        # Create a BoundaryNorm with the given bounds
+        norm = mcolors.BoundaryNorm(bounds, cmap_discrete.N, clip=False)
+        
     else:
-        color_min = color_min
-        color_max = color_max
-
-    # Create a Robinson projection
-    projection = ccrs.Robinson()
-
-    # Specify the number of discrete color levels
-    num_levels = levels  # Adjust this based on your preference
-
-    # Create a discrete colormap
-    cmap_discrete = plt.cm.get_cmap(cmap_name, num_levels)
-
-    # Define boundaries for colorbar ticks
-    bounds = np.linspace(color_min, color_max, num_levels)
-    bounds = np.round(bounds, 2)
-
-    # Create a BoundaryNorm for discrete color levels
-    norm = mcolors.BoundaryNorm(bounds, cmap_discrete.N, clip=False)
+        # Use linear spacing if levels is an integer
+        if color_min is None:
+            color_min = dataset[variable].min().item()
+        if color_max is None:
+            color_max = dataset[variable].max().item()
+        bounds = np.linspace(color_min, color_max, levels)
+        bounds = np.round(bounds, 2)
+        num_levels = levels
+        # Ensure correct number of colors in the colormap
+        cmap_discrete = plt.cm.get_cmap(color, num_levels)
+        norm = Normalize(vmin=color_min, vmax=color_max)
 
     # Create a subplot with adjusted layout and aspect ratio
-    fig, ax = plt.subplots(subplot_kw={'projection': projection}, figsize=(12, 6))
+    fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()}, figsize=(12, 6))
 
     # Plot the dataset
     im = ax.pcolormesh(
@@ -546,90 +527,72 @@ def plot_map(variable, dataset=None, cmap_name='hot_r', title='', label='', colo
     ax.coastlines(resolution='110m', color='gray', linewidth=1)
     ax.add_feature(cfeature.LAND, color='white')
     ax.set_title(title)
-    # Adjust the elliptical boundary line width
-    for spine in ax.spines.values():
-        spine.set_linewidth(0.5)
 
     # Create a custom colorbar with a triangular arrow at the end
     cax = fig.add_axes([0.27, 0.03, 0.5, 0.05])  # Adjust these values to position the colorbar
-    if color_min < 0:
-        cb = ColorbarBase(cax, cmap=cmap_discrete, norm=Normalize(vmin=color_min, vmax=color_max), 
-                      orientation='horizontal', extend='both')
-    else:
-        cb = ColorbarBase(cax, cmap=cmap_discrete, norm=Normalize(vmin=color_min, vmax=color_max), 
-                      orientation='horizontal', extend='max')
+    cb = ColorbarBase(cax, cmap=cmap_discrete, norm=norm, orientation='horizontal', extend='both' if np.min(bounds) < 0 else 'max')
     cb.set_label(label)
     
     if output_dir and filename:
         plt.savefig(output_dir + filename, dpi=600, bbox_inches='tight')
-    elif filename:
-        plt.savefig(filename, dpi=600, bbox_inches='tight')
-
-    # Show the plot
     plt.show()
 
 
-def plot_country(column, df=None, title="Map", label=None, color_palette='viridis', num_classes=5, class_type='natural', output_dir=None, filename=None, csv_path=None):
-    
-    if df is None and csv_path is None:
+def plot_country(column, dataframe=None, title="Map", label=None, color='viridis', num_classes=5, class_type='geometric', output_dir=None, filename=None, csv_path=None):
+    if dataframe is None and csv_path is None:
         raise ValueError("Either 'pandas dataframe' or 'csv path' must be provided.")
-    elif df is not None and csv_path is not None:
-        raise ValueError("Only one of pandas dataframe' or 'csv path' should be provided.")
+    elif dataframe is not None and csv_path is not None:
+        raise ValueError("Only one of 'pandas dataframe' or 'csv path' should be provided.")
     
     if csv_path:
         try:
-            df = pd.read_csv(csv_path, encoding='utf-8')
+            dataframe = pd.read_csv(csv_path, encoding='utf-8')
         except UnicodeDecodeError:
-            df = pd.read_csv(csv_path, encoding='latin1')
+            dataframe = pd.read_csv(csv_path, encoding='latin1')
     
     # Load and project the world shapefile
-    base_directory = os.path.dirname(os.path.abspath(__file__))
-    shapefile_path =  os.path.join(base_directory, "CShapes_v2_converted_2023.shp")
+    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_directory, "data")
+    shapefile_path =  os.path.join(data_dir, "CShapes_v2_converted_2023.shp")
     world_gdf = gpd.read_file(shapefile_path)
     world_gdf = world_gdf.to_crs('EPSG:4326')
     robinson_proj = ccrs.Robinson()
     world_gdf = world_gdf.to_crs(robinson_proj.proj4_init)
 
     # Merge the shapefile with the DataFrame
-    merged = world_gdf.merge(df, on='ISO3')
+    merged = world_gdf.merge(dataframe, on='ISO3')
 
     # Classifier configuration
-    if class_type == 'natural':
-        classifier = mc.NaturalBreaks(merged[column], k=num_classes)
-    elif class_type == 'equal':
-        classifier = mc.EqualInterval(merged[column], k=num_classes)
-    elif class_type == 'quantiles':
-        classifier = mc.Quantiles(merged[column], k=num_classes)
-    elif class_type == 'log10':
-        merged[column] = np.log10(merged[column] + 1)  # Adding 1 to avoid log10(0)
-        classifier = mc.NaturalBreaks(merged[column], k=num_classes)
-        
+    if isinstance(class_type, str):
+        if class_type == 'equal':
+            merged['class'] = calculate.equal_interval(merged[column], num_classes)
+        elif class_type == 'quantile':
+            merged['class'] = calculate.quantile_classes(merged[column], num_classes)
+        elif class_type == 'geometric':
+            merged['class'] = calculate.geometric_interval(merged[column], num_classes)
+        elif class_type == 'std':
+            merged['class'] = calculate.standard_deviation(merged[column], num_classes)
+    elif isinstance(class_type, list):  # Check if class_type is a list
+        manual_bins = class_type
+        merged['class'] = pd.cut(merged[column], bins=manual_bins, include_lowest=True, labels=False)
+    else:
+        raise ValueError("Invalid class_type provided. Must be 'equal', 'geometric', 'std_dev', or a list of bin edges.")
 
-    merged['class'] = classifier.yb
-    merged = merged.sort_values(by='class')
+    # Calculate the actual number of unique classes present
+    actual_classes = merged['class'].nunique()
+    num_classes = min(num_classes, actual_classes)
 
-    # Get the unique class values and their boundaries
-    class_bins = classifier.bins
-    # Create the class range list based on the bins
-    class_ranges = []
-    previous_bin = 0
-    for bin_edge in class_bins:
-        class_ranges.append(f"{int(previous_bin)} - {int(bin_edge)}")
-        previous_bin = bin_edge
-
-    # Assign the class ranges back to the DataFrame
-    class_ranges.append(f"{int(previous_bin)} - {int(merged[column].max())}")
-    merged['class_range'] = merged['class'].apply(lambda x: class_ranges[x])
-    unique_classes = merged['class_range'].unique()    
+    # Calculate the maximum value for the specified column within each class
+    class_maxima = merged.groupby('class')[column].max()
     
     # Set up the plot
     fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()}, figsize=(12, 6))
     ax.set_global()
     ax.add_feature(cartopy.feature.COASTLINE, linewidth=0.75)
     ax.add_feature(cartopy.feature.BORDERS, linewidth=0.5)
-
+    
     # Set colormap
-    cmap = ListedColormap(sns.color_palette(color_palette, num_classes).as_hex())
+    cmap = ListedColormap(sns.color_palette(color, num_classes).as_hex())
 
     # Plotting
     merged.plot(column='class', cmap=cmap, linewidth=0, ax=ax, edgecolor='0.8', legend=False)
@@ -637,22 +600,13 @@ def plot_country(column, df=None, title="Map", label=None, color_palette='viridi
     sm.set_array([])  # Important for ensuring the colorbar recognizes the full range
     cbar = fig.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.046, pad=0.04)
     cbar.set_label(label, fontsize=12)
-
-    # Modify class range values only while displaying in the color bar
-    colorbar_labels = unique_classes.copy()
-
-    # First class: "< max value of first class"
-    colorbar_labels[0] = f"< {int(class_bins[0])}"  
-
-    # Last class: "> max value of previous class"
-    colorbar_labels[-1] = f"> {int(class_bins[-1])}"
-
-    # For all other classes, use only the max value (upper bound of the class)
-    for i in range(1, len(colorbar_labels) - 1):
-        colorbar_labels[i] = f"{int(class_bins[i])}"  # Keep only the max value
+    
+    # Assuming unique_classes is a list of numerical values
+    colorbar_labels = [f"{int(x)}" for x in class_maxima]
 
     # Setting custom labels without tick marks
     tick_locations = np.linspace(0.5 / num_classes, 1 - 0.5 / num_classes, num_classes)
+    # tick_locations = np.linspace(1 / num_classes, 1, num_classes)
 
     cbar.set_ticks(tick_locations)
     cbar.set_ticklabels(colorbar_labels, fontsize=10)

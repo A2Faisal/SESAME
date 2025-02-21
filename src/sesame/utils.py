@@ -226,31 +226,26 @@ def add_grid_variables(ds, resolution, variable_name, normalize_by_area):
 
     # Ensure UserWarning is always shown during this function
     warnings.simplefilter('always', UserWarning)
-    
+    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_directory, "data")     
     resolution_str = str(resolution)
     if resolution_str == "1" or resolution_str == "1.0":
-        # Add grid area variable
-        base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
+        # Add grid area variable  
+        grid_ds = xr.open_dataset(os.path.join(data_dir, "G.land_sea_mask.1deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if normalize_by_area:
-            # # Replace 0 values in 'land_area' with NaN
-            # land_frac["land_area"] = land_frac["land_area"].where(land_frac["land_area"] != 0, np.nan)
-            # ds[variable_name] = ds[variable_name] / land_frac["land_area"]
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     
-    elif resolution_str == "0.5":
-        base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
+    elif resolution_str == "0.5":       
+        grid_ds = xr.open_dataset(os.path.join(data_dir, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if normalize_by_area:
             ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
             
-    elif resolution_str == "0.25":
-        base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
+    elif resolution_str == "0.25":          
+        grid_ds = xr.open_dataset(os.path.join(data_dir, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         if normalize_by_area:
@@ -630,31 +625,23 @@ def poly_fraction(ds, variable_name, resolution, polygons_gdf=None):
     variable_name = replace_special_characters(variable_name)
     # Save the attributes of the variable
     attrs = ds[variable_name].attrs
-
+    
+    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_directory, "data")
     resolution_str = str(resolution)
-    if resolution_str == "1" or resolution_str == "1.0":
-        base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.1deg.nc"))
+    if resolution_str == "1" or resolution_str == "1.0":    
+        grid_ds = xr.open_dataset(os.path.join(data_dir, "G.land_sea_mask.1deg.nc"))
         ds = xr.merge([ds, grid_ds])
-        # # ensure there is no grid values if land fraction is 0
-        # land_frac_da = xr.where(ds["land_frac"] > 0, 1, ds["land_frac"])
-        # ds[variable_name] = ds[variable_name] * land_frac_da
-        # # Compute the new fraction using the maximum of ds[variable_name] and ds["land_area"]
-        # ds[variable_name] = ds[variable_name] / np.maximum(ds[variable_name], ds["land_area"])
-        # # Ensure no values are greater than 1, keeping NaNs unchanged
-        # ds[variable_name] = ds[variable_name].where(ds[variable_name].isnull() | (ds[variable_name] <= 1), 1)
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
 
-    elif resolution_str == "0.5":
-        base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_5deg.nc"))
+    elif resolution_str == "0.5":     
+        grid_ds = xr.open_dataset(os.path.join(data_dir, "G.land_sea_mask.0_5deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
     
-    elif resolution_str == "0.25":
-        base_directory = os.path.dirname(os.path.abspath(__file__))        
-        grid_ds = xr.open_dataset(os.path.join(base_directory, "G.land_sea_mask.0_25deg.nc"))
+    elif resolution_str == "0.25":    
+        grid_ds = xr.open_dataset(os.path.join(data_dir, "G.land_sea_mask.0_25deg.nc"))
         # Merge with the dataset
         ds = xr.merge([ds, grid_ds])       
         ds[variable_name] = ds[variable_name] / grid_ds["grid_area"]
@@ -1195,7 +1182,8 @@ def delete_temporary_folder(folder_path):
 
 def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, grid_area=False, resolution=1, aggregation=None, method='sum', verbose=False):
     
-    base_directory = os.path.dirname(os.path.abspath(__file__))
+    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_directory, "data")
     # Load dataset from NetCDF file if provided
     if input_netcdf_path:
         ds = xr.open_dataset(input_netcdf_path)
@@ -1223,20 +1211,20 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
 
     # Load ISO3 to continent mapping from CSV
     try:
-        iso3_continent_df = pd.read_csv(os.path.join(base_directory, "un_geoscheme.csv"), encoding='utf-8')
+        iso3_continent_df = pd.read_csv(os.path.join(data_dir, "un_geoscheme.csv"), encoding='utf-8')
     except UnicodeDecodeError:
-        iso3_continent_df = pd.read_csv(os.path.join(base_directory, "un_geoscheme.csv"), encoding='latin1')
+        iso3_continent_df = pd.read_csv(os.path.join(data_dir, "un_geoscheme.csv"), encoding='latin1')
 
     # Loop through each variable in the dataset
     for var in variables_list:
         try:
             resolution_str = str(resolution)
             if resolution_str == "1" or resolution_str == "1.0":
-                cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))
+                cntry_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.1deg.2000-2023.a.nc"))
             elif resolution_str == "0.5":
-                cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
+                cntry_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_5deg.2000-2023.a.nc"))
             elif resolution_str == "0.25":
-                cntry_ds = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc"))
+                cntry_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_25deg.2000-2023.a.nc"))
         except FileNotFoundError as e:
             print(f"Error while reading file {e}")
 
@@ -1334,14 +1322,15 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
 
 
 def check_iso3_with_country_ds(df, resolution_str):
-    base_directory = os.path.dirname(os.path.abspath(__file__))
+    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_directory, "data")
     
     if resolution_str == "1" or resolution_str == "1.0":
-        cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.1deg.2000-2023.a.nc"))   
+        cntry = xr.open_dataset(os.path.join(data_dir, "country_fraction.1deg.2000-2023.a.nc"))   
     elif resolution_str == "0.5":
-        cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_5deg.2000-2023.a.nc"))
+        cntry = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_5deg.2000-2023.a.nc"))
     elif resolution_str == "0.25":
-        cntry = xr.open_dataset(os.path.join(base_directory, "country_fraction.0_25deg.2000-2023.a.nc")) 
+        cntry = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_25deg.2000-2023.a.nc")) 
     else:
         raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")
     
@@ -1389,3 +1378,5 @@ def convert_iso3_by_year(df, year):
     df_copy = df_copy.groupby('ISO3', as_index=False).sum(numeric_only=True)
 
     return df_copy
+
+

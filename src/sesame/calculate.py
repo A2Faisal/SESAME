@@ -1,5 +1,4 @@
 import os
-import re
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Polygon, MultiPolygon, LineString, MultiLineString
@@ -7,6 +6,7 @@ import pyproj
 import numpy as np
 import xarray as xr
 import warnings
+
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -349,4 +349,48 @@ def average_variables(variables=None, dataset=None, new_variable_name=None, time
         averaged_dataset = averaged_dataset.expand_dims(time=[time_coord])
     
     return averaged_dataset
+
+
+def equal_interval(data, num_classes):
+    min_val = data.min()
+    max_val = data.max()
+    interval = (max_val - min_val) / num_classes
+    intervals = [min_val + i * interval for i in range(num_classes + 1)]
+    intervals[-1] += 1e-10  # Extend the last bin a tiny bit to ensure the max value is included
+    return pd.cut(data, bins=intervals, right=True, include_lowest=True, labels=False)
+
+def quantile_classes(data, num_classes):
+    # Remove NaN values from data
+    data_clean = data.dropna()
+    # Calculate quantiles
+    quantiles = np.linspace(0, 1, num_classes + 1)
+    return pd.qcut(data_clean, q=quantiles, labels=False, precision=2)
+
+def geometric_interval(data, num_classes):
+    min_val = data.min()
+    max_val = data.max()
+    if min_val <= 0:
+        min_val = 1  # adjust because geometric progression cannot start at 0 or negative
+    ratio = (max_val / min_val) ** (1 / num_classes)
+    intervals = [min_val * (ratio ** i) for i in range(num_classes + 1)]
+    # Extend the last interval slightly to ensure max value is included
+    intervals[-1] = max_val * (1 + 1e-10)  # Slightly extend the last bin
+    return pd.cut(data, bins=intervals, include_lowest=True, labels=False)
+
+def standard_deviation(data, num_classes, width=1):
+    mean_val = data.mean()
+    std_dev = data.std()
+    # Calculate the range of standard deviations to cover
+    intervals = [mean_val + i * width * std_dev for i in range(-num_classes // 2, num_classes // 2 + 1)]
+    
+    # Extend the intervals to include all data
+    min_val = data.min()
+    max_val = data.max()
+    if min_val < intervals[0]:
+        intervals.insert(0, min_val)  # Insert minimum value if it's outside the first interval
+    if max_val > intervals[-1]:
+        intervals.append(max_val)  # Append maximum value if it's outside the last interval
+    
+    return pd.cut(data, bins=intervals, include_lowest=True, labels=False)
+
 
