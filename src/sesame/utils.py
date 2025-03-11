@@ -226,7 +226,7 @@ def add_grid_variables(ds, resolution, variable_name, normalize_by_area):
 
     # Ensure UserWarning is always shown during this function
     warnings.simplefilter('always', UserWarning)
-    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")     
     resolution_str = str(resolution)
     if resolution_str == "1" or resolution_str == "1.0":
@@ -626,7 +626,7 @@ def poly_fraction(ds, variable_name, resolution, polygons_gdf=None):
     # Save the attributes of the variable
     attrs = ds[variable_name].attrs
     
-    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
     resolution_str = str(resolution)
     if resolution_str == "1" or resolution_str == "1.0":    
@@ -1182,7 +1182,7 @@ def delete_temporary_folder(folder_path):
 
 def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, grid_area=False, resolution=1, aggregation=None, method='sum', verbose=False):
     
-    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
     # Load dataset from NetCDF file if provided
     if input_netcdf_path:
@@ -1322,7 +1322,7 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
 
 
 def check_iso3_with_country_ds(df, resolution_str):
-    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
     
     if resolution_str == "1" or resolution_str == "1.0":

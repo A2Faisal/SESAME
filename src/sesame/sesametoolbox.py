@@ -641,7 +641,7 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         # check and convert ISO3 based on occupation or previous control, given a specific year
         input_df = utils.convert_iso3_by_year(df=input_df, year=time)
     
-    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
     if eez:
         country_ds = xr.open_dataset(os.path.join(data_dir, "eezs.1deg.nc"))
@@ -738,7 +738,7 @@ def country_2_iso3(df, column):
     """
 
     # Convert country names to ISO3
-    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
     json_path = os.path.join(data_dir, "Names.json")
     with open(json_path, 'r') as file:

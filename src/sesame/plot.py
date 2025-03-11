@@ -526,6 +526,8 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_mi
 
     ax.coastlines(resolution='110m', color='gray', linewidth=1)
     ax.add_feature(cfeature.LAND, color='white')
+    # without outer boundary
+    # ax.spines['geo'].set_visible(False)
     ax.set_title(title)
 
     # Create a custom colorbar with a triangular arrow at the end
@@ -551,7 +553,7 @@ def plot_country(column, dataframe=None, title="Map", label=None, color='viridis
             dataframe = pd.read_csv(csv_path, encoding='latin1')
     
     # Load and project the world shapefile
-    base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
     shapefile_path =  os.path.join(data_dir, "CShapes_v2_converted_2023.shp")
     world_gdf = gpd.read_file(shapefile_path)
