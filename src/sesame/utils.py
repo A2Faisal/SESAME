@@ -1309,8 +1309,10 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
 
         dataframes.append(df)
 
-    # Merge DataFrames and add 'Year' column if time is specified
-    merged_df = pd.concat(dataframes, axis=0)
+    # Merge all DataFrames horizontally on 'ISO3'
+    merged_df = dataframes[0]
+    for df in dataframes[1:]:
+        merged_df = pd.merge(merged_df, df, on='ISO3', how='outer')
 
     # Perform aggregation if specified
     if aggregation:
