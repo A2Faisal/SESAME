@@ -480,45 +480,135 @@ def plot_time_series(variable, dataset=None, agg_function='sum', plot_type='both
     plt.show()
 
 
-def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_min=None, color_max=None, levels=10, output_dir=None, filename=None, netcdf_directory=None):
+def plot_map(variable, dataset=None, color='hot_r', title='', label='',
+             vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False,
+             output_dir=None, filename=None, netcdf_directory=None, show=True):
+    
+    """
+    Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
+
+    Parameters
+    ----------
+    variable : str
+        Name of the variable in the xarray Dataset to plot.
+    dataset : xarray.Dataset, optional
+        An already-loaded xarray Dataset containing the variable. Required if `netcdf_directory` is not provided.
+    color : str, default 'hot_r'
+        Matplotlib colormap name for the plot (discrete color scale).
+    title : str, default ''
+        Title of the map.
+    label : str, default ''
+        Label for the colorbar.
+    vmin : float, optional
+        Minimum data value for the colorbar range. If not provided, the minimum of the variable is used.
+    vmax : float, optional
+        Maximum data value for the colorbar range. If not provided, the maximum of the variable is used.
+    extend_min : bool, default False
+        If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
+    extend_max : bool, default False
+        If True, includes values above `vmax` in the last color class and shows a right arrow on the colorbar.
+    levels : int or list of float, default 10
+        Either the number of color intervals or a list of explicit interval boundaries.
+    out_bound : bool, default True
+        Whether to display the outer boundary (spine) of the map projection.
+    remove_ata : bool, default False
+        If True, removes Antarctica from the map by excluding data below 60°S latitude.
+    output_dir : str, optional
+        Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    filename : str, optional
+        Filename (with extension) for saving the figure. If not provided, the plot is not saved.
+    netcdf_directory : str, optional
+        File path to a NetCDF file. Used if `dataset` is not provided.
+    show: bool, True
+        Whether or not show the map
+
+    Notes
+    -----
+    - If both `extend_min` and `extend_max` are False, the dataset is clipped strictly within [vmin, vmax].
+    - The colorbar will use arrows to indicate out-of-bound values only if `extend_min` or `extend_max` is True.
+    - Tick formatting on the colorbar is:
+        - Integer-only if the data range is all positive (vmin >= 0).
+        - Two decimal places if any value is below 0.
+    - If `remove_ata` is True, the colorbar is placed slightly higher to avoid overlap with the map.
+
+    Raises
+    ------
+    ValueError
+        If both or neither of `dataset` and `netcdf_directory` are provided.
+
+    Example
+    -------
+    >>> plot_map(
+    ...     variable='npp',
+    ...     dataset=ds.isel(time=-1),
+    ...     vmin=0,
+    ...     vmax=1200,
+    ...     extend_max=True,
+    ...     color='Greens',
+    ...     levels=10,
+    ...     remove_ata=True,
+    ...     title='Net Primary Productivity',
+    ...     label='gC/m²/year',
+    ...     filename='npp_map.png'
+    ... )
+    """
+    
     if dataset is None and netcdf_directory is None:
         raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
     elif dataset is not None and netcdf_directory is not None:
         raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
     
     if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory) 
+        dataset = xr.open_dataset(netcdf_directory) 
 
-    if isinstance(levels, list):
-        # Directly use provided levels if it's a list
-        bounds = levels
-        num_levels = len(levels) - 1
-        # Ensure correct number of colors in the colormap
-        cmap_discrete = plt.cm.get_cmap(color, num_levels)
-        # Create a BoundaryNorm with the given bounds
-        norm = mcolors.BoundaryNorm(bounds, cmap_discrete.N, clip=False)
-        
+    data = dataset[variable]
+    # Remove Antarctica if requested (e.g., keep only latitudes > -60°)
+    if remove_ata:
+        dataset = dataset.where(dataset['lat'] > -60, drop=True)
+        data = dataset[variable]
+
+
+    # Default vmin/vmax if not provided
+    if vmin is None:
+        vmin = data.min().item()
+    if vmax is None:
+        vmax = data.max().item()
+
+    # Data filtering based on rounding flags
+    extend = 'neither'
+    if extend_min and extend_max:
+        extend = 'both'
+    elif extend_min:
+        extend = 'min'
+        data = data.where(data <= vmax)
+    elif extend_max:
+        extend = 'max'
+        data = data.where(data >= vmin)
     else:
-        # Use linear spacing if levels is an integer
-        if color_min is None:
-            color_min = dataset[variable].min().item()
-        if color_max is None:
-            color_max = dataset[variable].max().item()
-        bounds = np.linspace(color_min, color_max, levels)
+        data = data.where((data >= vmin) & (data <= vmax))
+
+    # Create levels and colormap
+    if isinstance(levels, list):
+        bounds = levels
+        num_levels = len(bounds) - 1
+    else:
+        step = (vmax - vmin) / levels
+        bounds = np.arange(vmin, vmax + step, step)
         bounds = np.round(bounds, 2)
-        num_levels = levels
-        # Ensure correct number of colors in the colormap
-        cmap_discrete = plt.cm.get_cmap(color, num_levels)
-        norm = Normalize(vmin=color_min, vmax=color_max)
+        num_levels = len(bounds) - 1
 
-    # Create a subplot with adjusted layout and aspect ratio
+    # Updated colormap call (future-proof)
+    cmap_discrete = plt.get_cmap(color, num_levels)
+    
+    # Color normalization
+    norm = mcolors.BoundaryNorm(bounds, cmap_discrete.N)
+
+    # Plot
     fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()}, figsize=(12, 6))
-
-    # Plot the dataset
     im = ax.pcolormesh(
         dataset['lon'],
         dataset['lat'],
-        dataset[variable].values,
+        data,
         transform=ccrs.PlateCarree(),
         cmap=cmap_discrete,
         norm=norm,
@@ -526,32 +616,59 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_mi
 
     ax.coastlines(resolution='110m', color='gray', linewidth=1)
     ax.add_feature(cfeature.LAND, color='white')
-    # without outer boundary
-    # ax.spines['geo'].set_visible(False)
     ax.set_title(title)
+    ax.spines['geo'].set_visible(out_bound)
 
-    # Create a custom colorbar with a triangular arrow at the end
-    cax = fig.add_axes([0.27, 0.03, 0.5, 0.05])  # Adjust these values to position the colorbar
-    cb = ColorbarBase(cax, cmap=cmap_discrete, norm=norm, orientation='horizontal', extend='both' if np.min(bounds) < 0 else 'max')
+    # Colorbar
+    if remove_ata:
+        cax = fig.add_axes([0.27, 0.08, 0.5, 0.05])
+    else:
+        cax = fig.add_axes([0.27, 0.03, 0.5, 0.05])
+        
+    cb = ColorbarBase(cax, cmap=cmap_discrete, norm=norm, orientation='horizontal', extend=extend)
     cb.set_label(label)
+
+    # Format colorbar ticks based on data range
+    tick_values = bounds
+    if (vmax - vmin) <= 10:
+        tick_labels = [f"{val:.2f}" for val in tick_values]
+    else:
+        tick_labels = [f"{val:.0f}" for val in tick_values]
+
+    cb.set_ticks(tick_values)
+    cb.set_ticklabels(tick_labels)
+
+    # Save figure
+    if filename:
+        save_path = os.path.join(output_dir if output_dir else os.getcwd(), filename)
+        plt.savefig(save_path, dpi=600, bbox_inches='tight')
     
-    if output_dir and filename:
-        plt.savefig(output_dir + filename, dpi=600, bbox_inches='tight')
-    plt.show()
+    if show:
+        plt.show()
+        
+    return ax
+    
+    
 
 
-def plot_country(column, dataframe=None, title="Map", label=None, color='viridis', num_classes=5, class_type='geometric', output_dir=None, filename=None, csv_path=None):
+def plot_country(column, dataframe=None, title="", label="", color='viridis', cmap=None, levels=10, output_dir=None, filename=None, csv_path=None, 
+                 remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
+
     if dataframe is None and csv_path is None:
-        raise ValueError("Either 'pandas dataframe' or 'csv path' must be provided.")
-    elif dataframe is not None and csv_path is not None:
-        raise ValueError("Only one of 'pandas dataframe' or 'csv path' should be provided.")
-    
+        raise ValueError("Provide either a dataframe or a csv_path.")
+    if dataframe is not None and csv_path is not None:
+        raise ValueError("Provide only one of dataframe or csv_path.")
+
     if csv_path:
         try:
             dataframe = pd.read_csv(csv_path, encoding='utf-8')
         except UnicodeDecodeError:
             dataframe = pd.read_csv(csv_path, encoding='latin1')
-    
+
+    if remove_ata:
+        dataframe = dataframe[dataframe['ISO3'] != 'ATA']
+
+    # Load shapefile
     # Load and project the world shapefile
     base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
@@ -561,65 +678,77 @@ def plot_country(column, dataframe=None, title="Map", label=None, color='viridis
     robinson_proj = ccrs.Robinson()
     world_gdf = world_gdf.to_crs(robinson_proj.proj4_init)
 
-    # Merge the shapefile with the DataFrame
+    # Merge with data
     merged = world_gdf.merge(dataframe, on='ISO3')
+    data = merged[column]
 
-    # Classifier configuration
-    if isinstance(class_type, str):
-        if class_type == 'equal':
-            merged['class'] = calculate.equal_interval(merged[column], num_classes)
-        elif class_type == 'quantile':
-            merged['class'] = calculate.quantile_classes(merged[column], num_classes)
-        elif class_type == 'geometric':
-            merged['class'] = calculate.geometric_interval(merged[column], num_classes)
-        elif class_type == 'std':
-            merged['class'] = calculate.standard_deviation(merged[column], num_classes)
-    elif isinstance(class_type, list):  # Check if class_type is a list
-        manual_bins = class_type
-        merged['class'] = pd.cut(merged[column], bins=manual_bins, include_lowest=True, labels=False)
+    # --- Default vmin/vmax ---
+    if vmin is None:
+        vmin = data.min().item()
+    if vmax is None:
+        vmax = data.max().item()
+
+    # --- Data masking based on flags ---
+    extend = 'neither'
+    if extend_min and extend_max:
+        extend = 'both'
+    elif extend_min:
+        extend = 'min'
+        data = data.where(data <= vmax)
+    elif extend_max:
+        extend = 'max'
+        data = data.where(data >= vmin)
     else:
-        raise ValueError("Invalid class_type provided. Must be 'equal', 'geometric', 'std_dev', or a list of bin edges.")
+        data = data.where((data >= vmin) & (data <= vmax))
 
-    # Calculate the actual number of unique classes present
-    actual_classes = merged['class'].nunique()
-    num_classes = min(num_classes, actual_classes)
+    # --- Create bounds using linspace (accurate binning) ---
+    if isinstance(levels, list):
+        bounds = levels
+        num_levels = len(bounds) - 1
+    else:
+        bounds = np.linspace(vmin, vmax, levels + 1)
+        bounds = np.round(bounds, 4)
+        num_levels = len(bounds) - 1
 
-    # Calculate the maximum value for the specified column within each class
-    class_maxima = merged.groupby('class')[column].max()
-    
-    # Set up the plot
+    # --- Colormap & normalization ---
+    if cmap is None:
+        cmap = plt.get_cmap(color, num_levels)
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+    # --- Setup plot ---
     fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Robinson()}, figsize=(12, 6))
     ax.set_global()
-    ax.add_feature(cartopy.feature.COASTLINE, linewidth=0.75)
-    ax.add_feature(cartopy.feature.BORDERS, linewidth=0.5)
-    
-    # Set colormap
-    cmap = ListedColormap(sns.color_palette(color, num_classes).as_hex())
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
+    ax.add_feature(cfeature.BORDERS, linewidth=0.5)
+    ax.spines['geo'].set_visible(out_bound)
+    ax.set_title(title, fontsize=14)
 
-    # Plotting
-    merged.plot(column='class', cmap=cmap, linewidth=0, ax=ax, edgecolor='0.8', legend=False)
-    sm = plt.cm.ScalarMappable(cmap=cmap)
-    sm.set_array([])  # Important for ensuring the colorbar recognizes the full range
-    cbar = fig.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.046, pad=0.04)
-    cbar.set_label(label, fontsize=12)
-    
-    # Assuming unique_classes is a list of numerical values
-    colorbar_labels = [f"{int(x)}" for x in class_maxima]
+    merged[column] = data
+    merged.plot(column=column, cmap=cmap, norm=norm, linewidth=0, ax=ax, edgecolor='0.8',
+                missing_kwds={"color": "lightgrey", "hatch": "///"})
 
-    # Setting custom labels without tick marks
-    tick_locations = np.linspace(0.5 / num_classes, 1 - 0.5 / num_classes, num_classes)
-    # tick_locations = np.linspace(1 / num_classes, 1, num_classes)
+    # --- Colorbar ---
+    cax = fig.add_axes([0.27, 0.08 if remove_ata else 0.03, 0.5, 0.03])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cb = fig.colorbar(sm, cax=cax, orientation='horizontal', extend=extend)
+    cb.set_label(label, fontsize=12)
 
-    cbar.set_ticks(tick_locations)
-    cbar.set_ticklabels(colorbar_labels, fontsize=10)
-    cbar.ax.set_xticklabels(colorbar_labels, rotation=0)
-    cbar.ax.tick_params(size=0)
-    
-    # Add title and save the figure
-    plt.title(title, fontsize=14)
-    if output_dir and filename:
-        plt.savefig(output_dir + filename, dpi=600, bbox_inches='tight')
-    elif filename:
-        plt.savefig(filename, dpi=600, bbox_inches='tight')
+    # --- Ticks centered within each class ---
+    tick_values = bounds
+    show_decimals = abs(vmax - vmin) < 10
+
+    if show_decimals:
+        tick_labels = [f"{val:.2f}" for val in tick_values]
+    else:
+        tick_labels = [f"{val:.0f}" for val in tick_values]
         
+    cb.set_ticks(tick_values)
+    cb.set_ticklabels(tick_labels)
+
+    # --- Save ---
+    if filename:
+        save_path = os.path.join(output_dir if output_dir else os.getcwd(), filename)
+        plt.savefig(save_path, dpi=600, bbox_inches='tight')
+
     plt.show()

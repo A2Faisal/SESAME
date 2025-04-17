@@ -584,7 +584,7 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         a netcdf variable data path as string
     csv_file_path : str, optional
         a tabular file where data is stored based on their jurisdiction or ISO3 code. The csv file must hold a
-        column named “ISO3”. If not, then users must use country_2_ISO3 function to convert the country
+        column named “ISO3”. If not, then users must use add_iso3_column function to convert the country
         name to their corresponding ISO3 code.
     input_ds : xarray.Dataset
         Input NetCDF dataset with spatial coordinates.
@@ -717,7 +717,7 @@ def get_netcdf_info(netcdf_path, variable_name=None):
     netcdf_info = get.get_netcdf_info(netcdf_path=netcdf_path, variable_name=variable_name)
     return netcdf_info
 
-def country_2_iso3(df, column):
+def add_iso3_column(df, column):
     """
     Convert country names in a DataFrame column to their corresponding ISO3 country codes.
 
@@ -846,52 +846,84 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     
     plot.plot_hexbin(variable1, variable2, dataset, dataset2, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename, netcdf_directory, netcdf_directory2)
     
-def plot_map(variable, dataset=None, color='hot_r', title='', label='', color_min=None, color_max=None, levels=10, output_dir=None, filename=None, netcdf_directory=None):
-
+def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, netcdf_directory=None):
+    
     """
-    Plots a variable from a dataset as a 2D map with customizable options.
+    Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
 
     Parameters
     ----------
     variable : str
-        The name of the variable to plot from the dataset.
-    dataset : xarray.Dataset or None, optional
-        The dataset containing the variable to be plotted. If None, the dataset is read from `netcdf_directory`.
-    color : str, optional
-        The colormap to use for the plot. Default is 'hot_r'.
-    title : str, optional
-        The title of the plot. Default is an empty string.
-    label : str, optional
-        The label for the colorbar. Default is an empty string.
-    color_min : float or None, optional
-        The minimum value for the color scale. If None, the minimum value is determined automatically. Default is None.
-    color_max : float or None, optional
-        The maximum value for the color scale. If None, the maximum value is determined automatically. Default is None.
-    levels : int or list, optional
-        If int, the number of discrete color levels to create within the color range; if list, the explicit bin edges for color mapping.
-    output_dir : str or None, optional
-        Directory to save the output plot. If None, the plot is not saved. Default is None.
-    filename : str or None, optional
-        The name of the output file for the plot. If None, no file is saved. Default is None.
-    netcdf_directory : str or None, optional
-        Directory containing the netCDF file to load the dataset from, if `dataset` is not provided. Default is None.
-
-    Returns
-    -------
-    None
-        The function creates a 2D map plot of the specified variable and displays it. If `output_dir` and `filename`
-        are provided, the plot is saved to the specified location.
+        Name of the variable in the xarray Dataset to plot.
+    dataset : xarray.Dataset, optional
+        An already-loaded xarray Dataset containing the variable. Required if `netcdf_directory` is not provided.
+    color : str, default 'hot_r'
+        Matplotlib colormap name for the plot (discrete color scale).
+    title : str, default ''
+        Title of the map.
+    label : str, default ''
+        Label for the colorbar.
+    vmin : float, optional
+        Minimum data value for the colorbar range. If not provided, the minimum of the variable is used.
+    vmax : float, optional
+        Maximum data value for the colorbar range. If not provided, the maximum of the variable is used.
+    extend_min : bool, default False
+        If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
+    extend_max : bool, default False
+        If True, includes values above `vmax` in the last color class and shows a right arrow on the colorbar.
+    levels : int or list of float, default 10
+        Either the number of color intervals or a list of explicit interval boundaries.
+    out_bound : bool, default True
+        Whether to display the outer boundary (spine) of the map projection.
+    remove_ata : bool, default False
+        If True, removes Antarctica from the map by excluding data below 60°S latitude.
+    output_dir : str, optional
+        Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    filename : str, optional
+        Filename (with extension) for saving the figure. If not provided, the plot is not saved.
+    netcdf_directory : str, optional
+        File path to a NetCDF file. Used if `dataset` is not provided.
+    show: bool, True
+        Whether or not show the map
 
     Notes
     -----
-    - If `dataset` is not provided, the function attempts to load a dataset from `netcdf_directory`.
-    - The colormap, color scale, and other attributes of the plot can be customized using the parameters.
-    - If `output_dir` and `filename` are specified, the plot is saved in the specified directory with the given filename.
+    - If both `extend_min` and `extend_max` are False, the dataset is clipped strictly within [vmin, vmax].
+    - The colorbar will use arrows to indicate out-of-bound values only if `extend_min` or `extend_max` is True.
+    - Tick formatting on the colorbar is:
+        - Integer-only if the data range is all positive (vmin >= 0).
+        - Two decimal places if any value is below 0.
+    - If `remove_ata` is True, the colorbar is placed slightly higher to avoid overlap with the map.
 
+    Raises
+    ------
+    ValueError
+        If both or neither of `dataset` and `netcdf_directory` are provided.
+
+    Example
+    -------
+    >>> plot_map(
+    ...     variable='npp',
+    ...     dataset=ds.isel(time=-1),
+    ...     vmin=0,
+    ...     vmax=1200,
+    ...     extend_max=True,
+    ...     color='Greens',
+    ...     levels=10,
+    ...     remove_ata=True,
+    ...     title='Net Primary Productivity',
+    ...     label='gC/m²/year',
+    ...     filename='npp_map.png'
+    ... )
     """
-
-    plot.plot_map(variable, dataset, color=color, title=title, label=label, color_min=color_min, color_max=color_max, levels=levels, output_dir=output_dir, filename=filename, netcdf_directory=netcdf_directory)
-     
+    
+    ax = plot.plot_map(variable=variable, dataset=dataset, color=color, title=title, label=label,
+             vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max, levels=levels, 
+             out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, 
+             netcdf_directory=netcdf_directory)
+    return ax
+    
+    
 def sum_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
 
     """
@@ -1026,32 +1058,71 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolu
                            verbose=verbose)
     return df
 
-def plot_country(column, dataframe=None, title="Map", label=None, color='viridis', num_classes=5, class_type='geometric', output_dir=None, filename=None, csv_path=None):
-    
+
+def plot_country( column, df=None, title="", label="", color='viridis', cmap=None, levels=10, output_dir=None, filename=None, csv_path=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
     """
-        Plots a choropleth map with data classified into specified number of classes and displayed according to a chosen classification type.
+    Plots a choropleth map of countries using a specified data column and a world shapefile.
 
-        Parameters:
-        - column (str): The name of the column in the dataframe which contains the data to be classified and plotted.
-        - df (pandas.DataFrame, optional): DataFrame containing the data to plot. If None, data must be provided via csv_path.
-        - title (str): Title for the map.
-        - label (str): Label for the colorbar, describing the data.
-        - color (str): Name of the color palette (from seaborn) to use for coloring the classes.
-        - num_classes (int): The desired number of classes to classify the data into.
-        - class_type (str or list): Specifies the classification strategy. Can be 'equal', 'quantile', 'geometric', 'std' (standard deviation), or directly a list of bin edges for manual classification.
-        - output_dir (str, optional): Directory path to save the output file. If not specified, the map will not be saved.
-        - filename (str, optional): Name of the output file to save the map. If not specified but output_dir is, uses a default filename.
-        - csv_path (str, optional): Path to the CSV file to be read as data if df is not provided. This must be specified if df is None.
+    Parameters:
+    -----------
+    column : str
+        Name of the column in the dataframe to visualize.
+    
+    df : pandas.DataFrame or None
+        DataFrame containing country-level data. Must include an 'ISO3' column.
+    
+    title : str, optional
+        Title of the map. Default is an empty string.
+    
+    label : str, optional
+        Label for the colorbar. Default is an empty string.
+    
+    color : str, optional
+        Name of the matplotlib colormap to use if `cmap` is not provided. Default is 'viridis'.
+    
+    cmap : matplotlib.colors.Colormap or None, optional
+        Custom colormap to use. If None, the colormap specified by `color` is used.
+    
+    levels : int or list of float, optional
+        Number of color levels (if int) or list of bin edges (if list). Default is 10.
+    
+    output_dir : str or None, optional
+        Directory to save the plot if `filename` is specified. Defaults to current working directory.
+    
+    filename : str or None, optional
+        Filename to save the plot. If None, the plot is not saved.
+    
+    csv_path : str or None, optional
+        Path to CSV file containing the data. Used if `dataframe` is not provided.
+    
+    remove_ata : bool, optional
+        Whether to remove Antarctica ('ATA') from the data. Default is False.
+    
+    out_bound : bool, optional
+        Whether to display map boundaries (spines). Default is True.
+    
+    vmin : float or None, optional
+        Minimum value for the colormap. If None, calculated from the data.
+    
+    vmax : float or None, optional
+        Maximum value for the colormap. If None, calculated from the data.
+    
+    extend_min : bool, optional
+        Whether to extend the colorbar below `vmin`. Default is False.
+    
+    extend_max : bool, optional
+        Whether to extend the colorbar above `vmax`. Default is False.
 
-        Returns:
-        None: Displays and optionally saves the plot. The function directly visualizes the map using matplotlib and does not return any value.
+    Raises:
+    -------
+    ValueError
+        If neither `dataframe` nor `csv_path` is provided, or if both are provided.
 
-        Raises:
-        - ValueError: If neither df nor csv_path is provided, or if both are provided, or if an invalid class_type is provided.
-        
-        Note:
-        - The function adjusts the colormap dynamically based on the actual number of unique classes that result from the classification method used. This ensures that the colorbar accurately represents the data distribution.
-        - If csv_path is used, the file encoding is first tried with 'utf-8', and if it fails, 'latin1' is used as a fallback.
-        """
+    Returns:
+    --------
+    None
+        Displays the map and optionally saves it to a file.
+    """
 
-    plot.plot_country(column=column, dataframe=dataframe, title=title, label=label, color=color, num_classes=num_classes, class_type=class_type, output_dir=output_dir, filename=filename, csv_path=csv_path)
+    plot.plot_country(column=column, dataframe=df, title=title, label=label, color=color, cmap=cmap, levels=levels, output_dir=output_dir, filename=filename, csv_path=csv_path, 
+                 remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max)
