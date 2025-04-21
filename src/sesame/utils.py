@@ -1305,7 +1305,8 @@ def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, gri
             else:
                 raise ValueError(f"Unsupported fold function: {method}")
 
-        print(f"Global tabular stats for {var}: {tabular_stat:.2f}")
+        if verbose:
+            print(f"Global tabular stats for {var}: {tabular_stat:.2f}")
 
         dataframes.append(df)
 
