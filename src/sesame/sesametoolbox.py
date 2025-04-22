@@ -846,7 +846,7 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     
     plot.plot_hexbin(variable1, variable2, dataset, dataset2, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename, netcdf_directory, netcdf_directory2)
     
-def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, netcdf_directory=None):
+def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, netcdf_directory=None, show=True):
     
     """
     Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
@@ -891,14 +891,16 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=Non
     - If both `extend_min` and `extend_max` are False, the dataset is clipped strictly within [vmin, vmax].
     - The colorbar will use arrows to indicate out-of-bound values only if `extend_min` or `extend_max` is True.
     - Tick formatting on the colorbar is:
-        - Integer-only if the data range is all positive (vmin >= 0).
-        - Two decimal places if any value is below 0.
+        - Two decimal places if (vmax - vmin) <= 10.
     - If `remove_ata` is True, the colorbar is placed slightly higher to avoid overlap with the map.
 
     Raises
     ------
     ValueError
         If both or neither of `dataset` and `netcdf_directory` are provided.
+        
+    Returns:
+    - Axes class of the map.
 
     Example
     -------
@@ -920,7 +922,7 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=Non
     ax = plot.plot_map(variable=variable, dataset=dataset, color=color, title=title, label=label,
              vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max, levels=levels, 
              out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, 
-             netcdf_directory=netcdf_directory)
+             netcdf_directory=netcdf_directory, show=show)
     return ax
     
     
@@ -1059,7 +1061,7 @@ def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolu
     return df
 
 
-def plot_country( column, df=None, title="", label="", color='viridis', cmap=None, levels=10, output_dir=None, filename=None, csv_path=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
+def plot_country(column, df=None, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, csv_path=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
     """
     Plots a choropleth map of countries using a specified data column and a world shapefile.
 
@@ -1078,10 +1080,7 @@ def plot_country( column, df=None, title="", label="", color='viridis', cmap=Non
         Label for the colorbar. Default is an empty string.
     
     color : str, optional
-        Name of the matplotlib colormap to use if `cmap` is not provided. Default is 'viridis'.
-    
-    cmap : matplotlib.colors.Colormap or None, optional
-        Custom colormap to use. If None, the colormap specified by `color` is used.
+        Name of the matplotlib colormap to use. Default is 'viridis'.
     
     levels : int or list of float, optional
         Number of color levels (if int) or list of bin edges (if list). Default is 10.
@@ -1124,5 +1123,5 @@ def plot_country( column, df=None, title="", label="", color='viridis', cmap=Non
         Displays the map and optionally saves it to a file.
     """
 
-    plot.plot_country(column=column, dataframe=df, title=title, label=label, color=color, cmap=cmap, levels=levels, output_dir=output_dir, filename=filename, csv_path=csv_path, 
+    plot.plot_country(column=column, dataframe=df, title=title, label=label, color=color, levels=levels, output_dir=output_dir, filename=filename, csv_path=csv_path, 
                  remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max)

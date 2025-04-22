@@ -648,10 +648,9 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='',
         
     return ax
     
-    
 
 
-def plot_country(column, dataframe=None, title="", label="", color='viridis', cmap=None, levels=10, output_dir=None, filename=None, csv_path=None, 
+def plot_country(column, dataframe=None, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, csv_path=None, 
                  remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
 
     if dataframe is None and csv_path is None:
@@ -711,8 +710,7 @@ def plot_country(column, dataframe=None, title="", label="", color='viridis', cm
         num_levels = len(bounds) - 1
 
     # --- Colormap & normalization ---
-    if cmap is None:
-        cmap = plt.get_cmap(color, num_levels)
+    cmap = plt.get_cmap(color, num_levels)
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
     # --- Setup plot ---
