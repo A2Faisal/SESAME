@@ -70,10 +70,15 @@ def get_regional_data(df, regions_df, region_name='Region 1'):
 
     return regional_sum
 
-
-def get_netcdf_info(netcdf_path, variable_name=None):
-
-    ds = xr.open_dataset(netcdf_path)
+def get_netcdf_info(netcdf_file, variable_name=None):
+    
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(netcdf_file, (str, bytes, os.PathLike)):
+        ds = xr.open_dataset(netcdf_file)
+    elif isinstance(netcdf_file, xr.Dataset):
+        ds = netcdf_file
+    else:
+        raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")
 
     # Get the list of variables using list comprehension
     var_short_name = [var for var in ds.data_vars if variable_name is None or var.startswith(variable_name)]

@@ -18,19 +18,17 @@ import calculate
 import plot
 import get
 
-def point_2_grid(points_gdf=None, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, 
-                 resolution=1, agg_column=None, agg_function="sum", attr_field=None, shapefile_path=None, 
-                 output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+def point_2_grid(points, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, 
+                 resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, 
+                 normalize_by_area=False, zero_is_value=False, verbose=False):
     
     """
     Converts point data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
 
     Parameters
     ----------
-    points_gdf : GeoDataFrame, optional
-        GeoDataFrame containing point data to be gridded. If not provided, `shapefile_path` must be specified.
-    shapefile_path : str, optional
-        Path to a shapefile containing point data, where the units of the data at each point are the same.
+    points : GeoDataFrame or str
+        Input point data to be gridded. Can be either a GeoDataFrame or a path to a point shapefile (.shp).
     variable_name : str, optional
         Name of the variable to include in the netCDF attributes metadata. Defaults to:
         - The unique entries in the `attr_field` column if specified.
@@ -59,9 +57,11 @@ def point_2_grid(points_gdf=None, variable_name='variable', long_name='variable'
     attr_field : str, optional
         Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
     output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
+        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
     output_filename : str, optional
-        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
+        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+        - Uses the input shapefile name if a shapefile path is given.
+        - Saves as `"gridded_points.nc"` if a GeoDataFrame is provided as input.
     normalize_by_area : bool, optional
         If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
     zero_is_value : bool, optional
@@ -81,18 +81,18 @@ def point_2_grid(points_gdf=None, variable_name='variable', long_name='variable'
     - The function creates a netCDF file, where data variables are aggregated based on the `agg_column` and `agg_function`.
     """
 
-    
-    if points_gdf is None and shapefile_path is None:
-        raise ValueError("Either 'points geodataframe' or 'shapefile directory' must be provided.")
-    elif points_gdf is not None and shapefile_path is not None:
-        raise ValueError("Only one of 'points geodataframe' or 'shapefile directory' should be provided.")
+    # Determine if input is a path (string or Path) or a GeoDataFrame
+    if isinstance(points, (str, bytes, os.PathLike)):
+        if verbose:
+            print("Reading shapefile from path...")
+        points_gdf = gpd.read_file(points)
+    elif isinstance(points, gpd.GeoDataFrame):
+        points_gdf = points
+    else:
+        raise TypeError("Input must be a GeoDataFrame or a shapefile path (string or Path).")
 
     # create gridded polygon
     polygons_gdf = create.create_gridded_polygon(resolution=resolution, out_polygon_path=None, grid_area=False)
-    
-    # spatial join
-    if shapefile_path:
-        points_gdf = gpd.read_file(shapefile_path)
     
     if attr_field is not None:
         unique_rows = points_gdf[attr_field].unique().tolist()
@@ -163,24 +163,28 @@ def point_2_grid(points_gdf=None, variable_name='variable', long_name='variable'
             global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, normalize_by_area=normalize_by_area, resolution=resolution)
             print(f"Global stats after gridding: {global_gridded_stats:.2f}")
     
-    # save the xarray dataset
-    if output_directory:
-        if shapefile_path:
-            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
+    if output_directory or output_filename:
+        # Set output directory
+        output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
+        # Set base filename
+        base_filename = os.path.splitext(os.path.basename(points))[0] if isinstance(points, (str, bytes, os.PathLike)) else "gridded_points"
+        # Set output filename
+        output_filename = output_filename or base_filename
+        # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
     return ds
 
-def line_2_grid(lines_gdf=None, variable_name='variable', long_name='variable', units="meter/grid-cell", source=None, time=None, 
-                 resolution=1, agg_column=None, agg_function="sum", attr_field=None, shapefile_path=None, 
-                 output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+def line_2_grid(lines, variable_name='variable', long_name='variable', units="meter/grid-cell", source=None, time=None, 
+                 resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, 
+                 normalize_by_area=False, zero_is_value=False, verbose=False):
     
     """
     Converts line data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
 
     Parameters
     ----------
-    lines_gdf : GeoDataFrame, optional
-        GeoDataFrame containing line data to be gridded. If not provided, `shapefile_path` must be specified.
+    lines : GeoDataFrame or str
+        Input lines data to be gridded. Can be either a GeoDataFrame or a path to a line/polyline shapefile (.shp).
     shapefile_path : str, optional
         Path to a shapefile containing line data, where the units of the data at each line are the same 
         (e.g., road width in meters).
@@ -212,9 +216,11 @@ def line_2_grid(lines_gdf=None, variable_name='variable', long_name='variable', 
     attr_field : str, optional
         Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
     output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
+        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
     output_filename : str, optional
-        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
+         Name of the output NetCDF file (without the `.nc` extension). If not provided:
+        - Uses the input shapefile name if a shapefile path is given.
+        - Saves as `"gridded_lines.nc"` if a GeoDataFrame is provided as input.
     normalize_by_area : bool, optional
         If True, normalizes the variable in each grid cell by the area of the grid cell (e.g., converts to value per square meter). Default is False.
     zero_is_value : bool, optional
@@ -235,17 +241,18 @@ def line_2_grid(lines_gdf=None, variable_name='variable', long_name='variable', 
     - The function creates a netCDF file, where data variables are aggregated and stored with metadata.
     """
 
-    if lines_gdf is None and shapefile_path is None:
-        raise ValueError("Either 'lines geodataframe' or 'shapefile directory' must be provided.")
-    elif lines_gdf is not None and shapefile_path is not None:
-        raise ValueError("Only one of 'lines geodataframe' or 'shapefile directory' should be provided.")
+    # Determine if input is a path (string or Path) or a GeoDataFrame
+    if isinstance(lines, (str, bytes, os.PathLike)):
+        if verbose:
+            print("Reading shapefile from path...")
+        lines_gdf = gpd.read_file(lines)
+    elif isinstance(lines, gpd.GeoDataFrame):
+        lines_gdf = lines
+    else:
+        raise TypeError("Input must be a GeoDataFrame or a shapefile path (string or Path).")
 
     # create gridded polygon
     polygons_gdf = create.create_gridded_polygon(resolution=resolution, out_polygon_path=None, grid_area=False)
-    
-    # spatial join
-    if shapefile_path:
-        lines_gdf = gpd.read_file(shapefile_path)
     
     if attr_field is not None:
         unique_rows = lines_gdf[attr_field].unique().tolist()
@@ -321,14 +328,18 @@ def line_2_grid(lines_gdf=None, variable_name='variable', long_name='variable', 
                 global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, agg_column=agg_column, normalize_by_area=normalize_by_area, resolution=resolution)
                 print(f"Global stats after gridding: {global_gridded_stats:.2f}.")
     
-    # save the xarray dataset
-    if output_directory:
-        if shapefile_path:
-            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
+    if output_directory or output_filename:
+        # Set output directory
+        output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
+        # Set base filename
+        base_filename = os.path.splitext(os.path.basename(lines))[0] if isinstance(lines, (str, bytes, os.PathLike)) else "gridded_lines"
+        # Set output filename
+        output_filename = output_filename or base_filename
+        # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
     return ds
 
-def poly_2_grid(poly_gdf=None, variable_name='variable', long_name='variable', units="m2/grid-cell", source=None, time=None, 
+def poly_2_grid(polygons, variable_name='variable', long_name='variable', units="m2/grid-cell", source=None, time=None, 
                  resolution=1, attr_field=None, shapefile_path=None, fraction=False, agg_function="sum", output_directory=None, 
                  output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
 
@@ -337,8 +348,8 @@ def poly_2_grid(poly_gdf=None, variable_name='variable', long_name='variable', u
 
     Parameters
     ----------
-    poly_gdf : GeoDataFrame, optional
-        GeoDataFrame containing polygon data to be gridded. If not provided, `shapefile_path` must be specified.
+    polygons : GeoDataFrame or str
+        Input polygons data to be gridded. Can be either a GeoDataFrame or a path to a polygons shapefile (.shp).
     shapefile_path : str, optional
         Path to a shapefile containing polygon data.
     variable_name : str, optional
@@ -369,9 +380,11 @@ def poly_2_grid(poly_gdf=None, variable_name='variable', long_name='variable', u
         - 'min': Minimum value.
         - 'std': Standard deviation.
     output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
+        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
     output_filename : str, optional
-        Name of the output netCDF file. Defaults to the input filename without a `.nc` extension.
+        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+        - Uses the input shapefile name if a shapefile path is given.
+        - Saves as `"gridded_polygons.nc"` if a GeoDataFrame is provided as input.
     normalize_by_area : bool, optional
         If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
     zero_is_value : bool, optional
@@ -393,13 +406,15 @@ def poly_2_grid(poly_gdf=None, variable_name='variable', long_name='variable', u
 
     """
 
-    if poly_gdf is None and shapefile_path is None:
-        raise ValueError("Either 'polygons geodataframe' or 'shapefile directory' must be provided.")
-    elif poly_gdf is not None and shapefile_path is not None:
-        raise ValueError("Only one of 'polygons geodataframe' or 'shapefile directory' should be provided.")
-
-    if shapefile_path:
-        poly_gdf = gpd.read_file(shapefile_path)
+    # Determine if input is a path (string or Path) or a GeoDataFrame
+    if isinstance(polygons, (str, bytes, os.PathLike)):
+        if verbose:
+            print("Reading shapefile from path...")
+        poly_gdf = gpd.read_file(polygons)
+    elif isinstance(polygons, gpd.GeoDataFrame):
+        poly_gdf = polygons
+    else:
+        raise TypeError("Input must be a GeoDataFrame or a shapefile path (string or Path).")
 
     # create gridded polygon
     polygons_gdf = create.create_gridded_polygon(resolution=resolution, out_polygon_path=None, grid_area=False)
@@ -480,10 +495,14 @@ def poly_2_grid(poly_gdf=None, variable_name='variable', long_name='variable', u
                                                               normalize_by_area=normalize_by_area, resolution=resolution) * 1e-6
             print(f"Global stats after gridding: {global_gridded_stats:.2f} km2.")
     
-    # save the xarray dataset
-    if output_directory:
-        if shapefile_path:
-            base_filename = os.path.splitext(os.path.basename(shapefile_path))[0]
+    if output_directory or output_filename:
+        # Set output directory
+        output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
+        # Set base filename
+        base_filename = os.path.splitext(os.path.basename(polygons))[0] if isinstance(polygons, (str, bytes, os.PathLike)) else "gridded_polygons"
+        # Set output filename
+        output_filename = output_filename or base_filename
+        # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
     return ds  
 
@@ -514,9 +533,11 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
     netcdf_variable : str, optional
         Name of the variable to extract from the netCDF file, if applicable. Required for netCDF inputs.
     output_directory : str, optional
-        Directory where the output netCDF file will be saved. Default is None.
+        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
     output_filename : str, optional
-        Filename for the output netCDF file. Default is None.
+        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+        - Uses `variable_name` if it is specified.
+        - Defaults to `regridded.nc` if none of the above are provided.
     padding : str, optional
         Padding strategy ('symmetric' or 'end').
     zero_is_value : bool, optional
@@ -542,15 +563,17 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
     file_extension = os.path.splitext(raster_path)[1]
 
     if file_extension == ".tif":
-        print("Reading the tif file.")
+        if verbose:
+            print("Reading the tif file.")
         # Convert TIFF data to a re-gridded dataset
         ds = utils.tif_2_ds(input_raster=raster_path, agg_function=agg_function, variable_name=variable_name, 
                       long_name=long_name, units=units, source=source, resolution=resolution, time=time, padding=padding,
                       zero_is_value=zero_is_value, normalize_by_area=normalize_by_area, verbose=verbose)
     
     elif file_extension == ".nc" or file_extension == ".nc4":
+        if verbose:
+            print("Reading the nc file.")
         # Convert netCDF to TIFF
-        print("Reading the nc file.")
         netcdf_tif_path = utils.netcdf_2_tif(netcdf_path=raster_path, netcdf_variable=netcdf_variable, time=time)
         # Convert netCDF data to a re-gridded dataset
         ds = utils.tif_2_ds(input_raster=netcdf_tif_path, agg_function=agg_function, variable_name=variable_name, 
@@ -560,36 +583,38 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
         # Print an error message for unrecognized file types
         print("Error: File type is not recognized. File type should be either TIFF or netCDF file.")
 
-    # save the xarray dataset
-    if output_directory:
-        if raster_path:
-            base_filename = os.path.splitext(os.path.basename(raster_path))[0]
+    if output_directory or output_filename:
+        # Set output directory
+        output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
+        # Set base filename
+        base_filename = variable_name or "regridded"
+        # Set output filename
+        output_filename = output_filename or base_filename
+        # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
-    print("Re-gridding completed!")
+    
+    if verbose:
+        print("Re-gridding completed!")
     return ds
-   
-def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_file_path=None, input_ds=None,
-                 input_df=None, variable_name=None, long_name=None, units="value/grid-cell", source=None,
+
+def table_2_grid(surrogate_file, surrogate_variable, tabular_file, tabular_column, variable_name=None, long_name=None, units="value/grid-cell", source=None,
                  time=None, output_directory=None, output_filename=None, zero_is_value=False, normalize_by_area=False, eez=False, verbose=False):
     """
     Convert tabular data to a gridded dataset by spatially distributing values based on a NetCDF variable and a tabular column.
 
     Parameters:
     -----------
-    netcdf_variable : str
-        Variable name in the NetCDF dataset used for spatial distribution.
+    surrogate_file : xarray.Dataset or str
+        xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded 
+        into an xarray.Dataset. The dataset must include the variable specified in `surrogate_variable`.
+    surrogate_variable : str
+        Variable name in the NetCDF or xarray dataset used for spatial distribution.
+    tabular_file : pandas.DataFrame or str
+        Tabular dataset as a pandas DataFrame or a path to a CSV file. If a file path is provided, it will be 
+        automatically loaded into a DataFrame. The data must include a column named "ISO3" representing country codes. 
+        If not present, use the `add_iso3_column` utility function to convert country names to ISO3 codes.     
     tabular_column : str
         Column name in the tabular dataset with values to be spatially distributed.
-    netcdf_file_path : str, optional
-        a netcdf variable data path as string
-    csv_file_path : str, optional
-        a tabular file where data is stored based on their jurisdiction or ISO3 code. The csv file must hold a
-        column named “ISO3”. If not, then users must use add_iso3_column function to convert the country
-        name to their corresponding ISO3 code.
-    input_ds : xarray.Dataset
-        Input NetCDF dataset with spatial coordinates.
-    input_df : pandas.DataFrame
-        Input tabular dataset containing values to be distributed spatially.
     variable_name : str, optional
         Name of the variable. Default is None.
     long_name : str, optional
@@ -602,6 +627,13 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         Additional name for the output raster file. If None, a default name will be used.
     time : str, optional
         Time information for the dataset.
+    output_directory : str, optional
+        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
+    output_filename : str, optional
+        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+        - Uses `variable_name` if it is specified.
+        - Falls back to `long_name` or `tabular_column` if `variable_name` is not given.
+        - Defaults to `gridded_table.nc` if none of the above are provided.
     zero_is_value: bool, optional
         If the value is True, then the function will treat zero as an existent value and 0 values will be
         considered while calculating mean and STD.
@@ -620,13 +652,22 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         Resulting gridded dataset after spatial distribution of tabular values.
     """
     
-    if netcdf_file_path and csv_file_path:
-        input_ds = xr.open_dataset(netcdf_file_path)
-        input_df = pd.read_csv(csv_file_path)
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(surrogate_file, (str, bytes, os.PathLike)):
+        input_ds = xr.open_dataset(surrogate_file)
+    elif isinstance(surrogate_file, xr.Dataset):
+        input_ds = surrogate_file
+    else:
+        raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")
 
-    if not isinstance(input_ds, xr.Dataset) and isinstance(input_df, pd.DataFrame):
-        raise ValueError("Please provide either netcdf and csv file paths or xarray dataset and pandas dataframe.")
-
+    # Load tabular_file (either path or pandas.DataFrame)
+    if isinstance(tabular_file, (str, bytes, os.PathLike)):
+        input_df = pd.read_csv(tabular_file)
+    elif isinstance(tabular_file, pd.DataFrame):
+        input_df = tabular_file
+    else:
+        raise TypeError("`tabular_file` must be a pandas.DataFrame or a path to a CSV file.")
+    
     if variable_name is None:
         variable_name = long_name if long_name is not None else tabular_column
 
@@ -646,7 +687,7 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
     if eez:
         country_ds = xr.open_dataset(os.path.join(data_dir, "eezs.1deg.nc"))
         input_ds = input_ds.copy()
-        input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+        input_ds[surrogate_variable] = input_ds[surrogate_variable].fillna(0)
     else:
         # check and print dataframe's iso3 with country fraction dataset
         utils.check_iso3_with_country_ds(input_df, resolution_str)
@@ -654,24 +695,24 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         if resolution_str == "1" or resolution_str == "1.0":
             country_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.1deg.2000-2023.a.nc"))
             input_ds = input_ds.copy()
-            input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+            input_ds[surrogate_variable] = input_ds[surrogate_variable].fillna(0)
 
         elif resolution_str == "0.5":
             country_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_5deg.2000-2023.a.nc"))
             input_ds = input_ds.copy()
-            input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+            input_ds[surrogate_variable] = input_ds[surrogate_variable].fillna(0)
             
         elif resolution_str == "0.25":
             country_ds = xr.open_dataset(os.path.join(data_dir, "country_fraction.0_25deg.2000-2023.a.nc"))
             input_ds = input_ds.copy()
-            input_ds[netcdf_variable] = input_ds[netcdf_variable].fillna(0)
+            input_ds[surrogate_variable] = input_ds[surrogate_variable].fillna(0)
         else:
             raise ValueError("Please re-grid the netcdf file to 1, 0.5 or 0.25 degree.")
 
     input_ds, country_ds, a = utils.adjust_datasets(input_ds, country_ds, time)
-    print(f"Distributing {variable_name} onto {netcdf_variable}.")
+    print(f"Distributing {variable_name} onto {surrogate_variable}.")
 
-    new_ds = create.create_new_ds(input_ds, tabular_column, country_ds, netcdf_variable, input_df, verbose)
+    new_ds = create.create_new_ds(input_ds, tabular_column, country_ds, surrogate_variable, input_df, verbose)
 
     for var_name in new_ds.data_vars:
         a += np.nan_to_num(new_ds[var_name].to_numpy())
@@ -689,22 +730,55 @@ def table_2_grid(netcdf_variable, tabular_column, netcdf_file_path=None, csv_fil
         global_gridded_stats = utils.xarray_dataset_stats(dataset=ds, variable_name=variable_name, agg_column=None, normalize_by_area=normalize_by_area, resolution=resolution)
         print(f"Global stats after gridding: {global_gridded_stats:.2f}")
 
-    # save the xarray dataset
-    if output_directory:
-        if netcdf_file_path:
-            base_filename = os.path.splitext(os.path.basename(netcdf_file_path))[0]
+    if output_directory or output_filename:
+        # Set output directory
+        output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
+        # Set base filename
+        base_filename = variable_name or "gridded_table"
+        # Set output filename
+        output_filename = output_filename or base_filename
+        # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
 
     return ds
 
-def get_netcdf_info(netcdf_path, variable_name=None):
+def grid_2_table(grid_file, variables=None, time=None, grid_area=None, resolution=1, aggregation=None, agg_function='sum', verbose=False):
+    """
+    Process gridded data from an xarray Dataset to generate tabular data for different jurisdictions.
+
+    Parameters:
+    -----------
+    grid_file : xarray.Dataset or str
+    xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    variables : str, optional
+        Variables name to be processed. It can either be one variable or list of variables. If None, all variables in the dataset (excluding predefined ones) will be considered.
+    time : str, optional
+        Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
+    resolution : float, optional
+        Resolution of gridded data in degree. Default is 1 degree.
+    grid_area : str, optional
+        Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
+    aggregation : str, optional
+        Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
+    agg_function : str, optional, default 'sum'
+        Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.  
+    Returns:
+    --------
+    df : pandas DataFrame
+        Tabular data for different jurisdictions, including ISO3 codes, variable values, and optional 'Year' column.
+    """
+
+    df = utils.grid_2_table(grid_file=grid_file, variables=variables, time=time, grid_area=grid_area, resolution=resolution, aggregation=aggregation, method=agg_function, verbose=verbose)
+    return df
+
+def get_netcdf_info(netcdf_file, variable_name=None):
     """
     Extract information about variables and dimensions from a NetCDF dataset.
 
     Parameters
     ----------
-    netcdf_path : str
-        The file path to the NetCDF dataset.
+    netcdf_file : xarray.Dataset or str
+    xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     variable_name : str, optional
         The prefix or complete name of the variable to filter. If not provided, all variables are included.
 
@@ -714,7 +788,7 @@ def get_netcdf_info(netcdf_path, variable_name=None):
         A tuple containing lists of dimensions, short names, long names, units, & time values (if 'time' exists).
     """
 
-    netcdf_info = get.get_netcdf_info(netcdf_path=netcdf_path, variable_name=variable_name)
+    netcdf_info = get.get_netcdf_info(netcdf_file=netcdf_file, variable_name=variable_name)
     return netcdf_info
 
 def add_iso3_column(df, column):
@@ -753,53 +827,58 @@ def add_iso3_column(df, column):
             print(f"Country Not Found: {iso3_not_found}")
     return df
 
-def plot_histogram(variable, dataset=None, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None, netcdf_directory=None):
+def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None):
     
     """
     Create a histogram for an array variable in an xarray dataset.
     Optionally remove outliers and apply log transformations.
     
     Parameters:
-    - dataset: xarray.Dataset, the dataset containing the variables.
+    - dataset : xarray.Dataset or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variable: str, the name of the variable to plot.
     - bin_size: int, optional, the number of bins in the histogram.
     - color: str, optional, the color of the histogram bars.
     - remove_outliers: bool, optional, whether to remove outliers.
     - log_transform: str, optional, the type of log transformation ('log10', 'log', 'log2').
-    - netcdf_directory: str, optional: directory where netcdf file is located.
+    - output_dir : str, optional, Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_histogram.png".
     
     Returns:
     - None, displays the plot.
     """
-    plot.plot_histogram(variable, dataset, bin_size, color, plot_title, x_label, remove_outliers, log_transform, output_dir, filename, netcdf_directory)
+    plot.plot_histogram(dataset, variable, bin_size, color, plot_title, x_label, remove_outliers, log_transform, output_dir, filename)
     
-def plot_scatter(variable1, variable2, dataset=None, dataset2=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None, netcdf_directory=None, netcdf_directory2=None):
+def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None, netcdf_directory=None, netcdf_directory2=None):
     """
     Create a scatter plot for two variables in an xarray dataset.
     Optionally remove outliers and apply log transformations.
     
     Parameters:
-    - dataset: xarray.Dataset, the dataset containing the variables for the x-axis.
-    - variable1: str, the name of the first variable to plot on the x-axis.
-    - variable2: str, the name of the second variable to plot on the y-axis. If dataset2 is provided, this variable is from dataset2.
-    - dataset2: xarray.Dataset, optional, a second dataset containing the variable for the y-axis.
-    - remove_outliers: bool, optional, whether to remove outliers.
-    - log_transform: str, optional, the type of log transformation ('log10', 'log', 'log2').
-    - color: str, optional, the color of the scatter plot points.
-    - netcdf_directory: str, optional: directory where netcdf file of the variable is located.
-    - netcdf_directory2: str, optional: directory where netcdf file of the 2nd variable is located.
+    - variable1 : str, name of the variable to be plotted on the x-axis. Must be present in `dataset`.
+    - variable2 : str, name of the variable to be plotted on the y-axis. If `dataset2` is provided, this variable will be extracted from `dataset2`; otherwise, it must exist in `dataset`.
+    - dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by `variable1`, which will be used for the x-axis.
+    - dataset2 : xarray.Dataset or str, optional, a second dataset or a path to a NetCDF file containing the variable specified by `variable2` (for the y-axis). If not provided, `dataset` will be used for both variables.
+    - color: str, optional, the color map of the scatter plot.
+    - x_label: str, optional, the label for the x-axis.
+    - y_label: str, optional, the label for the y-axis.
+    - plot_title: str, optional, the title for the plot.
+    - remove_outliers: bool, optional, whether to remove outliers from the data.
+    - log_transform_1: str, optional, the type of log transformation for variable1 ('log10', 'log', 'log2').
+    - log_transform_2: str, optional, the type of log transformation for variable2 ('log10', 'log', 'log2').
+    - output_dir : str, optional, Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_scatter.png".
     
     Returns:
     - None, displays the plot.
     """
-    plot.plot_scatter(variable1, variable2, dataset, dataset2, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename, netcdf_directory, netcdf_directory2)
+    plot.plot_scatter(variable1, variable2, dataset, dataset2, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename)
     
-def plot_time_series(variable, dataset=None, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None, netcdf_directory=None):
+def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None, netcdf_directory=None):
     """
     Create a line plot and/or area plot for a time series data variable.
     
     Parameters:
-    - dataset: xarray.Dataset, the dataset containing the variable to plot.
+    - dataset : xarray.Dataset or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variable: str, the name of the variable to plot.
     - agg_function: str, the operation to apply ('sum', 'mean', 'max', 'std').
     - smoothing_window: int, optional, the window size for rolling mean smoothing.
@@ -809,15 +888,14 @@ def plot_time_series(variable, dataset=None, agg_function='sum', plot_type='both
     - x_label: str, optional, the label for the x-axis. Default is 'Year'.
     - y_label: str, optional, the label for the y-axis. Default is 'Value'.
     - plot_title: str, optional, the title of the plot. Default is 'Time Series Plot'.
-    - output_dir: str, optional, the directory to save the plot.
-    - filename: str, optional, the filename to save the plot.
-    - netcdf_directory: str, optional: directory where netcdf file is located.
+    - output_dir : str, optional, Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_time_series.png".
     
     Returns:
     - None, displays the plot.
     """
     
-    plot.plot_time_series(variable, dataset, agg_function, plot_type, color, plot_label, x_label, y_label, plot_title, smoothing_window, output_dir, filename, netcdf_directory)
+    plot.plot_time_series(dataset, variable, agg_function, plot_type, color, plot_label, x_label, y_label, plot_title, smoothing_window, output_dir, filename)
 
 def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None, netcdf_directory=None, netcdf_directory2=None):
     
@@ -825,10 +903,10 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     Create a hexbin plot for two variables in an xarray dataset.
 
     Parameters:
-    - dataset: xarray.Dataset, the dataset containing the variables for the x-axis.
-    - variable1: str, the name of the first variable to plot on the x-axis.
-    - variable2: str, the name of the second variable to plot on the y-axis. If dataset2 is provided, this variable is from dataset2.
-    - dataset2: xarray.Dataset, optional, a second dataset containing the variable for the y-axis.
+    - variable1 : str, name of the variable to be plotted on the x-axis. Must be present in `dataset`.
+    - variable2 : str, name of the variable to be plotted on the y-axis. If `dataset2` is provided, this variable will be extracted from `dataset2`; otherwise, it must exist in `dataset`.
+    - dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by `variable1`, which will be used for the x-axis.
+    - dataset2 : xarray.Dataset or str, optional, a second dataset or a path to a NetCDF file containing the variable specified by `variable2` (for the y-axis). If not provided, `dataset` will be used for both variables.
     - color: str, optional, the color map of the hexbin plot.
     - grid_size: int, optional, the number of hexagons in the x-direction.
     - x_label: str, optional, the label for the x-axis.
@@ -837,16 +915,16 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     - remove_outliers: bool, optional, whether to remove outliers from the data.
     - log_transform_1: str, optional, the type of log transformation for variable1 ('log10', 'log', 'log2').
     - log_transform_2: str, optional, the type of log transformation for variable2 ('log10', 'log', 'log2').
-    - netcdf_directory: str, optional: directory where netcdf file of the variable is located.
-    - netcdf_directory2: str, optional: directory where netcdf file of the 2nd variable is located.
-
+    - output_dir : str, optional, Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_hexbin.png".
+    
     Returns:
     - None, displays the plot.
     """
     
-    plot.plot_hexbin(variable1, variable2, dataset, dataset2, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename, netcdf_directory, netcdf_directory2)
+    plot.plot_hexbin(variable1, variable2, dataset, dataset2, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename)
     
-def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, netcdf_directory=None, show=True):
+def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, netcdf_directory=None, show=True):
     
     """
     Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
@@ -855,8 +933,8 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=Non
     ----------
     variable : str
         Name of the variable in the xarray Dataset to plot.
-    dataset : xarray.Dataset, optional
-        An already-loaded xarray Dataset containing the variable. Required if `netcdf_directory` is not provided.
+    dataset : xarray.Dataset, or str
+        xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     color : str, default 'hot_r'
         Matplotlib colormap name for the plot (discrete color scale).
     title : str, default ''
@@ -880,9 +958,7 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=Non
     output_dir : str, optional
         Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
     filename : str, optional
-        Filename (with extension) for saving the figure. If not provided, the plot is not saved.
-    netcdf_directory : str, optional
-        File path to a NetCDF file. Used if `dataset` is not provided.
+        Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_plot.png".
     show: bool, True
         Whether or not show the map
 
@@ -921,196 +997,49 @@ def plot_map(variable, dataset=None, color='hot_r', title='', label='', vmin=Non
     
     ax = plot.plot_map(variable=variable, dataset=dataset, color=color, title=title, label=label,
              vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max, levels=levels, 
-             out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, 
-             netcdf_directory=netcdf_directory, show=show)
+             out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, show=show)
     return ax
-    
-    
-def sum_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
 
-    """
-    Sum specified variables in the xarray dataset. If no variables are specified, sum all variables
-    except those starting with 'grid_area'. Fill NaNs with zero before summing, and convert resulting
-    zeros back to NaNs.
-    
-    Parameters:
-    - variables: list of str, the names of the variables to sum. If None, sum all variables except those
-                 starting with 'grid_area'.
-    - dataset: xarray.Dataset, optional, the dataset containing the variables.
-    - new_variable_name: str, optional, the name of the new variable to store the sum.
-    - time: optional, a specific time slice to select from the dataset.
-    - netcdf_directory: str, optional: directory where netcdf file is located. 
-    
-    Returns:
-    - xarray.Dataset, with the summed variable.
-    """
-    
-    ds = calculate.sum_variables(variables, dataset, new_variable_name, time, netcdf_directory)
-    return ds
-    
-def subtract_variables(variable1, variable2, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
-    
-    """
-    Subtract one variable from another in the xarray dataset.
-    Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs.
-    
-    Parameters:
-    - variable1: str, the name of the variable to subtract from.
-    - variable2: str, the name of the variable to subtract.
-    - dataset: xarray.Dataset, optional, the dataset containing the variables.
-    - new_variable_name: str, optional, the name of the new variable to store the result.
-    - time: optional, a specific time slice to select from the dataset.
-    - netcdf_directory: str, optional: directory where netcdf file is located. 
-    
-    Returns:
-    - xarray.Dataset, with the resulting variable.
-    """
-    ds = calculate.subtract_variables(variable1, variable2, dataset, new_variable_name, time, netcdf_directory)
-    return ds
-    
-def divide_variables(variable1, variable2, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
-    """
-    Divide one variable by another in the xarray dataset.
-    Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.
-    
-    Parameters:
-    - variable1: str, the name of the variable to be divided (numerator).
-    - variable2: str, the name of the variable to divide by (denominator).
-    - dataset: xarray.Dataset, optional, the dataset containing the variables.
-    - new_variable_name: str, optional, the name of the new variable to store the result.
-    - time: optional, a specific time slice to select from the dataset.
-    - netcdf_directory: str, optional: directory where netcdf file is located. 
-    
-    Returns:
-    - xarray.Dataset, with the resulting variable.
-    """
-    ds = calculate.divide_variables(variable1, variable2, dataset, new_variable_name, time, netcdf_directory)
-    return ds
-    
-def multiply_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
-    """
-    Multiply specified variables in the xarray dataset. If no variables are specified, multiply all variables.
-    Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.
-    
-    Parameters:
-    - variables: list of str, the names of the variables to multiply. If None, multiply all variables.
-    - dataset: xarray.Dataset, optional, the dataset containing the variables.
-    - new_variable_name: str, optional, the name of the new variable to store the product.
-    - time: optional, a specific time slice to select from the dataset.
-    - netcdf_directory: str, optional: directory where netcdf file is located. 
-    
-    Returns:
-    - xarray.Dataset, with the resulting variable.
-    """
-    
-    ds = calculate.multiply_variables(variables, dataset, new_variable_name, time, netcdf_directory)
-    
-    return ds
-    
-def average_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
-    """
-    Average specified variables in the xarray dataset. If no variables are specified, average all variables
-    except those starting with 'grid_area'. Fill NaNs with zero before averaging, and convert resulting
-    zeros back to NaNs.
-    
-    Parameters:
-    - variables: list of str, the names of the variables to average. If None, average all variables except those
-                 starting with 'grid_area'.
-    - dataset: xarray.Dataset, optional, the dataset containing the variables.
-    - new_variable_name: str, optional, the name of the new variable to store the average.
-    - time: optional, a specific time slice to select from the dataset.
-    - netcdf_directory: str, optional: directory where netcdf file is located.
-    
-    Returns:
-    - xarray.Dataset, with the averaged variable.
-    """
-    ds = calculate.average_variables(variables, dataset, new_variable_name, time, netcdf_directory)
-    return ds
-
-def grid_2_table(dataset=None, variables=None, time=None, grid_area=None, resolution=1, aggregation=None, agg_function='sum', verbose=False, netcdf_path=None):
-    """
-    Process gridded data from an xarray Dataset to generate tabular data for different jurisdictions.
-
-    Parameters:
-    -----------
-    dataset : xarray Dataset, optional
-        Gridded dataset containing spatial information.
-    variable : str, optional
-        Variable name to be processed. If None, all variables in the dataset (excluding predefined ones) will be considered.
-    time : str, optional
-        Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
-    resolution : float, optional
-        Resolution of gridded data in degree. Default is 1 degree.
-    grid_area : str, optional
-        Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
-    aggregation : str, optional
-        Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
-    agg_function : str, optional, default 'sum'
-        Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.  
-    netcdf_path : str, optional
-        Netcdf path containing path location. 
-    Returns:
-    --------
-    merged_df : pandas DataFrame
-        Tabular data for different jurisdictions, including ISO3 codes, variable values, and optional 'Year' column.
-    """
-   
-    df = utils.grid_2_table(input_netcdf_path=netcdf_path, ds=dataset, variables=variables, time=time, 
-                           grid_area=grid_area, resolution=resolution, aggregation=aggregation, method=agg_function, 
-                           verbose=verbose)
-    return df
-
-
-def plot_country(column, df=None, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, csv_path=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
+def plot_country(tabular_file, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, csv_path=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
     """
     Plots a choropleth map of countries using a specified data column and a world shapefile.
 
     Parameters:
     -----------
+    tabular_file : pandas.DataFrame or str
+        Input table containing country-level data. Can be either:
+        - A pandas DataFrame with the required `column`
+        - A string path to a CSV file, which will be automatically read into a DataFrame
     column : str
         Name of the column in the dataframe to visualize.
-    
-    df : pandas.DataFrame or None
-        DataFrame containing country-level data. Must include an 'ISO3' column.
-    
     title : str, optional
         Title of the map. Default is an empty string.
-    
     label : str, optional
         Label for the colorbar. Default is an empty string.
-    
     color : str, optional
         Name of the matplotlib colormap to use. Default is 'viridis'.
-    
     levels : int or list of float, optional
         Number of color levels (if int) or list of bin edges (if list). Default is 10.
-    
     output_dir : str or None, optional
         Directory to save the plot if `filename` is specified. Defaults to current working directory.
-    
     filename : str or None, optional
         Filename to save the plot. If None, the plot is not saved.
-    
-    csv_path : str or None, optional
-        Path to CSV file containing the data. Used if `dataframe` is not provided.
-    
     remove_ata : bool, optional
         Whether to remove Antarctica ('ATA') from the data. Default is False.
-    
     out_bound : bool, optional
         Whether to display map boundaries (spines). Default is True.
-    
     vmin : float or None, optional
         Minimum value for the colormap. If None, calculated from the data.
-    
     vmax : float or None, optional
         Maximum value for the colormap. If None, calculated from the data.
-    
     extend_min : bool, optional
         Whether to extend the colorbar below `vmin`. Default is False.
-    
     extend_max : bool, optional
         Whether to extend the colorbar above `vmax`. Default is False.
+    output_dir : str, optional
+        Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    filename : str, optional
+        Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_country_plot.png".
 
     Raises:
     -------
@@ -1123,5 +1052,98 @@ def plot_country(column, df=None, title="", label="", color='viridis', levels=10
         Displays the map and optionally saves it to a file.
     """
 
-    plot.plot_country(column=column, dataframe=df, title=title, label=label, color=color, levels=levels, output_dir=output_dir, filename=filename, csv_path=csv_path, 
-                 remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max)
+    plot.plot_country(tabular_file=tabular_file, column=column, title=title, label=label, color=color, levels=levels, output_dir=output_dir, filename=filename, remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max)
+            
+def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
+
+    """
+    Sum specified variables in the xarray dataset. If no variables are specified, sum all variables
+    except those starting with 'grid_area'. Fill NaNs with zero before summing, and convert resulting
+    zeros back to NaNs.
+    
+    Parameters:
+    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - variables: list of str, the names of the variables to sum. If None, sum all variables except those starting with 'grid_area' and 'land_frac'.
+    - new_variable_name: str, optional, the name of the new variable to store the sum.
+    - time: optional, a specific time slice to select from the dataset.
+    
+    Returns:
+    - xarray.Dataset, with the summed variable.
+    """
+    
+    ds = calculate.sum_variables(dataset, variables, new_variable_name, time)
+    return ds
+    
+def subtract_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
+    
+    """
+    Subtract one variable from another in the xarray dataset.
+    Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs.
+    
+    Parameters:
+    - variable1: str, the name of the variable to subtract from.
+    - variable2: str, the name of the variable to subtract.
+    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - new_variable_name: str, optional, the name of the new variable to store the result.
+    - time: optional, a specific time slice to select from the dataset.
+    
+    Returns:
+    - xarray.Dataset, with the resulting variable.
+    """
+    ds = calculate.subtract_variables(variable1, variable2, dataset, new_variable_name, time)
+    return ds
+    
+def divide_variables(variable1, variable2, dataset, new_variable_name=None, time=None, netcdf_directory=None):
+    """
+    Divide one variable by another in the xarray dataset.
+    Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.
+    
+    Parameters:
+    - variable1: str, the name of the variable to be divided (numerator).
+    - variable2: str, the name of the variable to divide by (denominator).
+    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - new_variable_name: str, optional, the name of the new variable to store the result.
+    - time: optional, a specific time slice to select from the dataset.
+    
+    Returns:
+    - xarray.Dataset, with the resulting variable.
+    """
+    ds = calculate.divide_variables(variable1, variable2, dataset, new_variable_name, time)
+    return ds
+    
+def multiply_variables(dataset, variables=None, new_variable_name=None, time=None, netcdf_directory=None):
+    """
+    Multiply specified variables in the xarray dataset. If no variables are specified, multiply all variables.
+    Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.
+    
+    Parameters:
+    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - variables: list of str, the names of the variables to multiply. If None, multiply all variables, excluding the "grid_area" and "land_frac" variables included in the dataset.
+    - new_variable_name: str, optional, the name of the new variable to store the product.
+    - time: optional, a specific time slice to select from the dataset.
+    
+    Returns:
+    - xarray.Dataset, with the resulting variable.
+    """
+    
+    ds = calculate.multiply_variables(dataset, variables, new_variable_name, time)
+    
+    return ds
+    
+def average_variables(dataset, variables=None, new_variable_name=None, time=None):
+    """
+    Average specified variables in the xarray dataset. If no variables are specified, average all variables
+    except those starting with 'grid_area'. Fill NaNs with zero before averaging, and convert resulting
+    zeros back to NaNs.
+    
+    Parameters:
+    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - variables: list of str, the names of the variables to average. If None, average all variables except those starting with 'grid_area' and 'land_frac'.
+    - new_variable_name: str, optional, the name of the new variable to store the average.
+    - time: optional, a specific time slice to select from the dataset.
+    
+    Returns:
+    - xarray.Dataset, with the averaged variable.
+    """
+    ds = calculate.average_variables(dataset, variables, new_variable_name, time)
+    return ds

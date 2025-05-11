@@ -1180,16 +1180,18 @@ def delete_temporary_folder(folder_path):
         print(f"Error deleting the folder: {e}")
 
 
-def grid_2_table(input_netcdf_path=None, ds=None, variables=None, time=None, grid_area=False, resolution=1, aggregation=None, method='sum', verbose=False):
+def grid_2_table(grid_file=None, variables=None, time=None, grid_area=False, resolution=1, aggregation=None, method='sum', verbose=False):
     
     base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
-    # Load dataset from NetCDF file if provided
-    if input_netcdf_path:
-        ds = xr.open_dataset(input_netcdf_path)
-
-    if not isinstance(ds, xr.Dataset):
-        raise ValueError("Please provide either a NetCDF file path or an xarray Dataset.")
+    
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(grid_file, (str, bytes, os.PathLike)):
+        ds = xr.open_dataset(grid_file)
+    elif isinstance(grid_file, xr.Dataset):
+        ds = grid_file
+    else:
+        raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")
 
     # Determine variables to process
     exclude_vars = ["time", "lat", "lon", "land_frac", "grid_area", "land_area"]

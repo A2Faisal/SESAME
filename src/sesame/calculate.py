@@ -100,7 +100,6 @@ def calculate_geodetic_pixel_area(lon, lat, pixel_width_deg, pixel_height_deg):
     return abs(area) #/ 1e6  Convert from square meters to square kilometers
 
 
-
 def calculate_grid_resolution(resolution):
     """
     Calculate the number of latitude and longitude grid cells based on the given resolution.
@@ -139,20 +138,26 @@ def calculate_grid_resolution(resolution):
         raise ValueError("Resolution should be in the format '<value> degree(s)' or a numeric value")
         
 
-def sum_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
-    if dataset is None and netcdf_directory is None:
-        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
-    elif dataset is not None and netcdf_directory is not None:
-        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
+def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(dataset, (str, bytes, os.PathLike)):
+        dataset = xr.open_dataset(dataset)
+    elif isinstance(dataset, xr.Dataset):
+        dataset = dataset
+    else:
+        raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")   
     
-    if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
+    # Ensure all specified variables are in the dataset
+    for var in variables:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
     
     if time is not None:
         dataset = dataset.sel(time=time, method='nearest')
         
     if variables is None:
-        variables = [var for var in list(dataset.data_vars) if not var.startswith("grid_area")]
+        exclude_vars = ("grid_area", "land_frac")
+        variables = [var for var in dataset.data_vars if not var.startswith(exclude_vars)]
     
     # Ensure all specified variables are in the dataset
     for var in variables:
@@ -181,23 +186,21 @@ def sum_variables(variables=None, dataset=None, new_variable_name=None, time=Non
     return summed_dataset
 
 
+def subtract_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
+    # Load dataset (accept path or xarray.Dataset)
+    if isinstance(dataset, (str, bytes, os.PathLike)):
+        dataset = xr.open_dataset(dataset)
+    elif not isinstance(dataset, xr.Dataset):
+        raise TypeError("`dataset` must be an xarray.Dataset or a path to a NetCDF file.")
 
-def subtract_variables(variable1, variable2, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
-    
-    if dataset is None and netcdf_directory is None:
-        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
-    elif dataset is not None and netcdf_directory is not None:
-        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
-    
-    if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
-        
+    # Select time if specified
     if time is not None:
         dataset = dataset.sel(time=time, method='nearest')
-        
-    # Ensure both specified variables are in the dataset
-    if variable1 not in dataset or variable2 not in dataset:
-        raise ValueError(f"Both variables '{variable1}' and '{variable2}' must be present in the dataset.")
+
+    # Ensure both variables are in the dataset
+    for var in [variable1, variable2]:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
     
     # Fill NaNs with zero before subtracting
     filled_variable1 = dataset[variable1].fillna(0)
@@ -222,22 +225,22 @@ def subtract_variables(variable1, variable2, dataset=None, new_variable_name=Non
     return result_dataset
 
 
-def divide_variables(variable1, variable2, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+def divide_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
     
-    if dataset is None and netcdf_directory is None:
-        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
-    elif dataset is not None and netcdf_directory is not None:
-        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
+    # Load dataset (accept path or xarray.Dataset)
+    if isinstance(dataset, (str, bytes, os.PathLike)):
+        dataset = xr.open_dataset(dataset)
+    elif not isinstance(dataset, xr.Dataset):
+        raise TypeError("`dataset` must be an xarray.Dataset or a path to a NetCDF file.")
 
-    if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
-        
+    # Select time if specified
     if time is not None:
         dataset = dataset.sel(time=time, method='nearest')
-        
-    # Ensure both specified variables are in the dataset
-    if variable1 not in dataset or variable2 not in dataset:
-        raise ValueError(f"Both variables '{variable1}' and '{variable2}' must be present in the dataset.")
+
+    # Ensure both variables are in the dataset
+    for var in [variable1, variable2]:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
     
     # Fill NaNs with zero before dividing
     filled_variable1 = dataset[variable1].fillna(0)
@@ -263,21 +266,27 @@ def divide_variables(variable1, variable2, dataset=None, new_variable_name=None,
     return result_dataset
 
 
-def multiply_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+def multiply_variables(dataset, variables=None, new_variable_name=None, time=None):
     
-    if dataset is None and netcdf_directory is None:
-        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
-    elif dataset is not None and netcdf_directory is not None:
-        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
-        
-    if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
-        
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(dataset, (str, bytes, os.PathLike)):
+        dataset = xr.open_dataset(dataset)
+    elif isinstance(dataset, xr.Dataset):
+        dataset = dataset
+    else:
+        raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")   
+    
+    # Ensure all specified variables are in the dataset
+    for var in variables:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
+    
     if time is not None:
         dataset = dataset.sel(time=time, method='nearest')
-    
+        
     if variables is None:
-        variables = [var for var in list(dataset.data_vars) if not var.startswith("grid_area")]
+        exclude_vars = ("grid_area", "land_frac")
+        variables = [var for var in dataset.data_vars if not var.startswith(exclude_vars)]
     
     # Ensure all specified variables are in the dataset
     for var in variables:
@@ -308,21 +317,27 @@ def multiply_variables(variables=None, dataset=None, new_variable_name=None, tim
     return product_dataset
 
 
-def average_variables(variables=None, dataset=None, new_variable_name=None, time=None, netcdf_directory=None):
+def average_variables(dataset, variables=None, new_variable_name=None, time=None):
     
-    if dataset is None and netcdf_directory is None:
-        raise ValueError("Either 'xarray dataset' or 'netcdf_directory' must be provided.")
-    elif dataset is not None and netcdf_directory is not None:
-        raise ValueError("Only one of 'xarray dataset' or 'netcdf_directory' should be provided.")
-   
-    if netcdf_directory:
-        dataset = xr.load_dataset(netcdf_directory)
-        
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(dataset, (str, bytes, os.PathLike)):
+        dataset = xr.open_dataset(dataset)
+    elif isinstance(dataset, xr.Dataset):
+        dataset = dataset
+    else:
+        raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")   
+    
+    # Ensure all specified variables are in the dataset
+    for var in variables:
+        if var not in dataset:
+            raise ValueError(f"Variable '{var}' not found in the dataset.")
+    
     if time is not None:
         dataset = dataset.sel(time=time, method='nearest')
         
     if variables is None:
-        variables = [var for var in list(dataset.data_vars) if not var.startswith("grid_area")]
+        exclude_vars = ("grid_area", "land_frac")
+        variables = [var for var in dataset.data_vars if not var.startswith(exclude_vars)]
     
     # Ensure all specified variables are in the dataset
     for var in variables:
