@@ -14,7 +14,7 @@ conda activate sesame_env
 
 conda install pip
 
-pip install opensesame
+pip install sesame
 
 ### Then at the top of your python script,
 import opensesame as sm

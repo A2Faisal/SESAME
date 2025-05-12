@@ -838,6 +838,9 @@ def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None
     - variable: str, the name of the variable to plot.
     - bin_size: int, optional, the number of bins in the histogram.
     - color: str, optional, the color of the histogram bars.
+    - plot_title: str, optional, the title for the plot.
+    - x_label: str, optional, the label for the x-axis.
+    - y_label: str, optional, the label for the y-axis.
     - remove_outliers: bool, optional, whether to remove outliers.
     - log_transform: str, optional, the type of log transformation ('log10', 'log', 'log2').
     - output_dir : str, optional, Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
@@ -848,7 +851,7 @@ def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None
     """
     plot.plot_histogram(dataset, variable, bin_size, color, plot_title, x_label, remove_outliers, log_transform, output_dir, filename)
     
-def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None, netcdf_directory=None, netcdf_directory2=None):
+def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
     """
     Create a scatter plot for two variables in an xarray dataset.
     Optionally remove outliers and apply log transformations.
@@ -865,6 +868,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_l
     - remove_outliers: bool, optional, whether to remove outliers from the data.
     - log_transform_1: str, optional, the type of log transformation for variable1 ('log10', 'log', 'log2').
     - log_transform_2: str, optional, the type of log transformation for variable2 ('log10', 'log', 'log2').
+    - equation : bool, optional, ff True, fits and displays a linear regression equation. 
     - output_dir : str, optional, Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
     - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_scatter.png".
     
@@ -873,7 +877,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_l
     """
     plot.plot_scatter(variable1, variable2, dataset, dataset2, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename)
     
-def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None, netcdf_directory=None):
+def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None):
     """
     Create a line plot and/or area plot for a time series data variable.
     
@@ -881,13 +885,13 @@ def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', co
     - dataset : xarray.Dataset or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variable: str, the name of the variable to plot.
     - agg_function: str, the operation to apply ('sum', 'mean', 'max', 'std').
-    - smoothing_window: int, optional, the window size for rolling mean smoothing.
     - plot_type: str, optional, the type of plot ('line', 'area', 'both'). Default is 'both'.
     - color: str, optional, the color of the plot. Default is 'blue'.
     - plot_label: str, optional, the label for the plot. Default is 'Area Plot'.
     - x_label: str, optional, the label for the x-axis. Default is 'Year'.
     - y_label: str, optional, the label for the y-axis. Default is 'Value'.
     - plot_title: str, optional, the title of the plot. Default is 'Time Series Plot'.
+    - smoothing_window: int, optional, the window size for rolling mean smoothing.
     - output_dir : str, optional, Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
     - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_time_series.png".
     
@@ -897,7 +901,7 @@ def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', co
     
     plot.plot_time_series(dataset, variable, agg_function, plot_type, color, plot_label, x_label, y_label, plot_title, smoothing_window, output_dir, filename)
 
-def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None, netcdf_directory=None, netcdf_directory2=None):
+def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
     
     """
     Create a hexbin plot for two variables in an xarray dataset.
@@ -924,7 +928,7 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     
     plot.plot_hexbin(variable1, variable2, dataset, dataset2, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename)
     
-def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, netcdf_directory=None, show=True):
+def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
     
     """
     Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
@@ -1000,7 +1004,7 @@ def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vm
              out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, show=show)
     return ax
 
-def plot_country(tabular_file, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, csv_path=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
+def plot_country(tabular_file, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
     """
     Plots a choropleth map of countries using a specified data column and a world shapefile.
 
@@ -1020,10 +1024,6 @@ def plot_country(tabular_file, column, title="", label="", color='viridis', leve
         Name of the matplotlib colormap to use. Default is 'viridis'.
     levels : int or list of float, optional
         Number of color levels (if int) or list of bin edges (if list). Default is 10.
-    output_dir : str or None, optional
-        Directory to save the plot if `filename` is specified. Defaults to current working directory.
-    filename : str or None, optional
-        Filename to save the plot. If None, the plot is not saved.
     remove_ata : bool, optional
         Whether to remove Antarctica ('ATA') from the data. Default is False.
     out_bound : bool, optional
@@ -1093,7 +1093,7 @@ def subtract_variables(variable1, variable2, dataset, new_variable_name=None, ti
     ds = calculate.subtract_variables(variable1, variable2, dataset, new_variable_name, time)
     return ds
     
-def divide_variables(variable1, variable2, dataset, new_variable_name=None, time=None, netcdf_directory=None):
+def divide_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
     """
     Divide one variable by another in the xarray dataset.
     Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.
@@ -1111,7 +1111,7 @@ def divide_variables(variable1, variable2, dataset, new_variable_name=None, time
     ds = calculate.divide_variables(variable1, variable2, dataset, new_variable_name, time)
     return ds
     
-def multiply_variables(dataset, variables=None, new_variable_name=None, time=None, netcdf_directory=None):
+def multiply_variables(dataset, variables=None, new_variable_name=None, time=None):
     """
     Multiply specified variables in the xarray dataset. If no variables are specified, multiply all variables.
     Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.
