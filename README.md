@@ -55,11 +55,12 @@ conda install pip
 # install SESAME from pip
 pip install sesame
 ```
-Step 2: 
-Add this as a Python code snippet:
-<pre> ```python import sesame as ssm ``` </pre>
+### Step 2: Add this as a Python code snippet:
+```bash
+import sesame as ssm 
+```
 
-If you are using Windows and encounter the error: 
+### If you are using Windows and encounter the error: 
 “ERROR: Failed building wheel for cartopy,” please follow these steps:
 
 1. Download and install the Microsoft C++ Build Tools from the official website:  
