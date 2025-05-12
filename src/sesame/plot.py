@@ -17,7 +17,7 @@ from matplotlib.colors import ListedColormap
 import cartopy
 import seaborn as sns
 
-import calculate
+from . import calculate
 
 
 def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None):

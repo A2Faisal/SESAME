@@ -48,8 +48,8 @@ conda create -n sesame_env
 conda activate sesame_env
 # install pip
 conda install pip
-# install SESAME from pip
-pip install sesame
+# install SESAME from testPyPI
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame==0.1.0
 ```
 ### Step 2: Add this as a Python code snippet:
 ```bash
@@ -65,18 +65,18 @@ import sesame as ssm
 2. During installation, make sure to select the **"Desktop development with C++"** workload.  
    This is required to build packages like cartopy that depend on C++ extensions.
 
-![Visual Studio Build Tools Installation](docs/images/vs_build_tools.png)
+![Visual Studio Build Tools Installation](https://github.com/A2Faisal/SESAME/blob/main/docs/SESAME-Software_Manual_v1.1.pdf)
 
 
 ## 🧪 Testing SESAME
 
 To verify the functionality of the SESAME toolbox, a Jupyter notebook is provided:
 
-📓 [Test Notebook: `test/test_sesametoolbox.ipynb`](test/test_sesametoolbox.ipynb)
+📓 [Test Notebook: `test/test_sesametoolbox.ipynb`](https://github.com/A2Faisal/SESAME/blob/main/test/test_sesametoolbox.ipynb)
 
 This notebook demonstrates core features using sample datasets located in:
 
-📁 `test/data/`
+📁 [Test Data: `test/data/`](https://github.com/A2Faisal/SESAME/tree/main/test/data)
 
 ### 📌 To run the test:
 
@@ -100,4 +100,4 @@ This notebook demonstrates core features using sample datasets located in:
 > 🔍 **Note:** Ensure that all paths in the notebook refer to `test/data/` correctly. The folder structure must be preserved when cloning or downloading the repository.
 
 ## Contact
-For questions or inquiries about the SESAME project, please contact [abdullah-al.faisal@mail.mcgill.ca](mailto:abdullah-al.faisal@mail.mcgill.ca).
+For questions or inquiries about the SESAME project, please contact [abdullah-al.faisal@mail.mcgill.ca](mailto:abdullah-al.faisal@mail.mcgill.ca) or [maxwell.kaye@mail.mcgill.ca](mailto:maxwell.kaye@mail.mcgill.ca).

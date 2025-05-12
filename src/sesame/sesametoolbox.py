@@ -5,18 +5,12 @@ import numpy as np
 import xarray as xr
 import json
 
-# import local libraries
-# from . import create
-# from . import utils
-# from . import calculate
-# from . import plot
-# from . import get
+from . import create
+from . import utils
+from . import calculate
+from . import plot
+from . import get
 
-import create
-import utils
-import calculate
-import plot
-import get
 
 def point_2_grid(points, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, 
                  resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, 
