@@ -14,10 +14,8 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ## 🗺️ Human-Earth Atlas
 
-📂 **Atlas Data Access**:  
-[https://doi.org/10.6084/m9.figshare.28432499](https://doi.org/10.6084/m9.figshare.28432499)
+📂 **Atlas Data Access and Citation**:
 
-📖 **Atlas Citation**:  
 Faisal, A. A., Kaye, M., Ahmed, M. & Galbraith, E. _The SESAME Human-Earth Atlas_. figshare [https://doi.org/10.6084/m9.figshare.28432499](https://doi.org/10.6084/m9.figshare.28432499) (2025).  
 
 
@@ -25,8 +23,7 @@ Faisal, A. A., Kaye, M., Ahmed, M. & Galbraith, E. _The SESAME Human-Earth Atlas
 
 ## 📄 Publications
 
-Faisal, A.A., Kaye, M., Ahmed, M. et al. (2025)._The SESAME Human-Earth Atlas_. *Scientific Data*, 12, 775.  
-[https://doi.org/10.1038/s41597-025-05087-5](https://doi.org/10.1038/s41597-025-05087-5)
+Faisal, A.A., Kaye, M., Ahmed, M. et al. (2025)._The SESAME Human-Earth Atlas_. *Scientific Data*, 12, 775. [https://doi.org/10.1038/s41597-025-05087-5](https://doi.org/10.1038/s41597-025-05087-5)
 
 ---
 
