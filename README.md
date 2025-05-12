@@ -65,7 +65,7 @@ import sesame as ssm
 2. During installation, make sure to select the **"Desktop development with C++"** workload.  
    This is required to build packages like cartopy that depend on C++ extensions.
 
-![Visual Studio Build Tools Installation](docs/images/vs_build_tools.png)
+![Visual Studio Build Tools Installation](https://github.com/A2Faisal/SESAME/blob/main/docs/images/vs_build_tools.png)
 
 
 ## 🧪 Testing SESAME
