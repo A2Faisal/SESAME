@@ -12,6 +12,34 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ---
 
+## 🛠️ Example Tools
+
+- **`point_2_grid`**  
+  Maps point data onto standardized global grids. Supports counting points per cell, summing or averaging associated values, or grouping by class to generate multi-variable datasets.
+
+- **`line_2_grid`**  
+  Maps line data onto global grids by calculating the length of each line segment within grid cells. Supports aggregation methods such as mean, max, or standard deviation through spatial intersections.
+
+- **`poly_2_grid`**  
+  Handles polygon data by computing the fraction or area of each polygon that overlaps with each grid cell. Supports combining multiple polygon types into a multi-variable NetCDF output.
+
+- **`grid_2_grid`**  
+  Converts raster data to a new grid resolution. Ensures global coverage, checks projections, fills in missing cells with NaNs, and supports aggregation methods like sum, mean, max, min, or standard deviation.
+
+- **`table_2_grid`**  
+  Converts jurisdiction-level tabular data into standardized grids using surrogate variables. Accounts for boundary changes over time for accurate spatial representation.
+
+- **`add_iso3_column`**  
+  Standardizes country names by converting them to ISO3 codes. This function is a prerequisite for running `table_2_grid`.
+
+- **`grid_2_table`**  
+  Reverses the gridding process by aggregating gridded data into summary tables based on predefined regions or countries.
+
+- **Built-in plotting functions**  
+  SESAME also includes tools for quick visualization and mapping, such as `plot_histogram`, `plot_scatter`, `plot_time_series`, and `plot_hexbin` for charts, and `plot_map`, `plot_country` for gridded or choropleth maps. These functions help generate both exploratory plots and publication-ready outputs with minimal setup.
+
+---
+
 ## 🗺️ Human-Earth Atlas
 
 📂 **Atlas Data Access and Citation**:
@@ -31,7 +59,7 @@ Faisal, A.A., Kaye, M., Ahmed, M. et al. (2025)._The SESAME Human-Earth Atlas_. 
 
 Detailed setup, usage instructions, advanced features, and testing procedures are included in the official software manual:
 
-📄 [**SESAME Software Manual (v1.1)**](docs/SESAME-Software_Manual_v1.1.pdf)
+📄 [**SESAME Software Manual (v1.1)**](https://github.com/A2Faisal/SESAME/blob/main/docs/SESAME-Software_Manual_v1.1.pdf)
 
 ---
 
