@@ -4,6 +4,29 @@
 
 The **SESAME project** aims to unify key human and non-human (Earth system) datasets into a shared spatially-gridded format. These datasets are often siloed in incompatible formats; SESAME bridges that gap to accelerate scientific discovery and interdisciplinary modeling.
 
+---
+
+## 📑 Table of Contents
+
+- [Goals](#-goals)
+- [Example Tools](#️-example-tools)
+  - [point_2_grid](#point_2_grid)
+  - [line_2_grid](#line_2_grid)
+  - [poly_2_grid](#poly_2_grid)
+  - [grid_2_grid](#grid_2_grid)
+  - [table_2_grid](#table_2_grid)
+  - [add_iso3_column](#add_iso3_column)
+  - [grid_2_table](#grid_2_table)
+  - [Built-in plotting functions](#built-in-plotting-functions)
+- [Human-Earth Atlas](#-human-earth-atlas)
+- [Publications](#-publications)
+- [Software Documentation](#-software-documentation)
+- [Installation Instructions](#-installation-instructions)
+- [Testing SESAME](#-testing-sesame)
+- [Contact](#contact)
+
+---
+
 ## 🎯 Goals
 
 - Unify human and non-human system datasets in a standardized spatially-gridded structure.
@@ -77,7 +100,7 @@ conda activate sesame_env
 # install pip
 conda install pip
 # install SESAME from testPyPI
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame==0.1.0
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.0
 ```
 ### Step 2: Add this as a Python code snippet:
 ```bash
@@ -85,7 +108,7 @@ import sesame as ssm
 ```
 
 ### If you are using Windows and encounter the error: 
-“ERROR: Failed building wheel for cartopy,” please follow these steps:
+"ERROR: Failed building wheel for cartopy," please follow these steps:
 
 1. Download and install the Microsoft C++ Build Tools from the official website:  
    [https://visualstudio.microsoft.com/visual-cpp-build-tools/](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
