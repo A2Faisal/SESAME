@@ -12,6 +12,47 @@ from . import plot
 from . import get
 
 
+"""
+SESAME: software tools for integrating Human - Earth System data
+
+SESAME is an open-source Python tool designed to make spatial data analysis, visualization, and exploration accessible to all.  
+Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock insights from geospatial data with just a few lines of code.
+
+---
+
+**What can you do with the SESAME toolbox?**
+
+- Effortlessly process, analyze, and visualize spatial datasets (e.g., shapefiles, GeoTIFFs, CSVs with coordinates or country names).
+- Perform spatial operations such as overlay, intersection, and variable extraction.
+- Create publication-ready maps and plots.
+- Integrate with the Human-Earth Atlas to explore global patterns in Human-Earth systems.
+
+**Getting Started with the Human-Earth Atlas:**
+
+1. Install SESAME.
+2. Download the Human-Earth Atlas ([Figshare Link](https://doi.org/10.6084/m9.figshare.28432499))
+3. Load your spatial data (e.g., land cover, population, climate).
+4. Use SESAME’s plotting tools to visualize and compare datasets.
+5. Explore the Human-Earth Atlas by overlaying your data with global reference layers.
+
+_Example:_
+```python
+import sesame as ssm
+
+# Load your data
+netcdf_file = "atlas/T.transportation.roads.nc"
+
+# Plot with Human-Earth Atlas
+ssm.plot_map(variable="roads_gross", dataset=netcdf_file, color='magma_r', title='Gross Road Mass', label='g m-2', vmin=0, vmax=1e4, extend_max=True)
+```
+
+![Gross Road Mass Map](images/gross_road.png)
+
+Ready to get started? Dive into the function docs below or read [the SESAME Human-Earth Atlas](https://www.nature.com/articles/s41597-025-05087-5) for inspiration!
+
+---
+"""
+
 def point_2_grid(points, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
     
     """
@@ -1015,12 +1056,14 @@ def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
     zeros back to NaNs.
     
     Parameters:
+    -----------
     - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variables: list of str, the names of the variables to sum. If None, sum all variables except those starting with 'grid_area' and 'land_frac'.
     - new_variable_name: str, optional, the name of the new variable to store the sum.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
+    --------
     - xarray.Dataset. with the summed variable.
 
     Example
@@ -1041,6 +1084,7 @@ def subtract_variables(variable1, variable2, dataset, new_variable_name=None, ti
     Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs.
     
     Parameters:
+    -----------
     - variable1: str, the name of the variable to subtract from.
     - variable2: str, the name of the variable to subtract.
     - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
@@ -1048,6 +1092,7 @@ def subtract_variables(variable1, variable2, dataset, new_variable_name=None, ti
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
+    --------
     - xarray.Dataset. with the resulting variable.
 
     Example
@@ -1067,6 +1112,7 @@ def divide_variables(variable1, variable2, dataset, new_variable_name=None, time
     Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.
     
     Parameters:
+    -----------
     - variable1: str, the name of the variable to be divided (numerator).
     - variable2: str, the name of the variable to divide by (denominator).
     - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
@@ -1074,6 +1120,7 @@ def divide_variables(variable1, variable2, dataset, new_variable_name=None, time
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
+    --------
     - xarray.Dataset. with the resulting variable.
 
     Example
@@ -1093,12 +1140,14 @@ def multiply_variables(dataset, variables=None, new_variable_name=None, time=Non
     Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.
     
     Parameters:
+    -----------
     - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variables: list of str, the names of the variables to multiply. If None, multiply all variables, excluding the "grid_area" and "land_frac" variables included in the dataset.
     - new_variable_name: str, optional, the name of the new variable to store the product.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
+    --------
     - xarray.Dataset. with the resulting variable.
 
     Example
@@ -1121,15 +1170,17 @@ def average_variables(dataset, variables=None, new_variable_name=None, time=None
     zeros back to NaNs.
     
     Parameters:
+    -----------
     - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variables: list of str, the names of the variables to average. If None, average all variables except those starting with 'grid_area' and 'land_frac'.
     - new_variable_name: str, optional, the name of the new variable to store the average.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
+    --------
     - xarray.Dataset. with the averaged variable.
 
-        Example
+    Example
     -------
     >>> average_variables(dataset=ds, 
     ...                  variables=["roads_gross", "buildings_gross"], 

@@ -910,7 +910,7 @@ Optionally remove outliers and apply log transformations.</p>
 except those starting with 'grid_area'. Fill NaNs with zero before summing, and convert resulting
 zeros back to NaNs.</p>
 
-<p>Parameters:</p>
+<h2 id="parameters">Parameters:</h2>
 
 <ul>
 <li>dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
@@ -919,7 +919,7 @@ zeros back to NaNs.</p>
 <li>time: optional, a specific time slice to select from the dataset.</li>
 </ul>
 
-<p>Returns:</p>
+<h2 id="returns">Returns:</h2>
 
 <ul>
 <li>xarray.Dataset. with the summed variable.</li>
@@ -951,7 +951,7 @@ zeros back to NaNs.</p>
             <div class="docstring"><p>Subtract one variable from another in the xarray dataset.
 Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs.</p>
 
-<p>Parameters:</p>
+<h2 id="parameters">Parameters:</h2>
 
 <ul>
 <li>variable1: str, the name of the variable to subtract from.</li>
@@ -961,7 +961,7 @@ Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs
 <li>time: optional, a specific time slice to select from the dataset.</li>
 </ul>
 
-<p>Returns:</p>
+<h2 id="returns">Returns:</h2>
 
 <ul>
 <li>xarray.Dataset. with the resulting variable.</li>
@@ -994,7 +994,7 @@ Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs
             <div class="docstring"><p>Divide one variable by another in the xarray dataset.
 Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.</p>
 
-<p>Parameters:</p>
+<h2 id="parameters">Parameters:</h2>
 
 <ul>
 <li>variable1: str, the name of the variable to be divided (numerator).</li>
@@ -1004,7 +1004,7 @@ Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.</
 <li>time: optional, a specific time slice to select from the dataset.</li>
 </ul>
 
-<p>Returns:</p>
+<h2 id="returns">Returns:</h2>
 
 <ul>
 <li>xarray.Dataset. with the resulting variable.</li>
@@ -1037,7 +1037,7 @@ Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.</
             <div class="docstring"><p>Multiply specified variables in the xarray dataset. If no variables are specified, multiply all variables.
 Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.</p>
 
-<p>Parameters:</p>
+<h2 id="parameters">Parameters:</h2>
 
 <ul>
 <li>dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
@@ -1046,7 +1046,7 @@ Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.<
 <li>time: optional, a specific time slice to select from the dataset.</li>
 </ul>
 
-<p>Returns:</p>
+<h2 id="returns">Returns:</h2>
 
 <ul>
 <li>xarray.Dataset. with the resulting variable.</li>
@@ -1080,7 +1080,7 @@ Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.<
 except those starting with 'grid_area'. Fill NaNs with zero before averaging, and convert resulting
 zeros back to NaNs.</p>
 
-<p>Parameters:</p>
+<h2 id="parameters">Parameters:</h2>
 
 <ul>
 <li>dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
@@ -1089,13 +1089,13 @@ zeros back to NaNs.</p>
 <li>time: optional, a specific time slice to select from the dataset.</li>
 </ul>
 
-<p>Returns:</p>
+<h2 id="returns">Returns:</h2>
 
 <ul>
 <li>xarray.Dataset. with the averaged variable.</li>
 </ul>
 
-<h2 id="example">    Example</h2>
+<h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">average_variables</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span> 
