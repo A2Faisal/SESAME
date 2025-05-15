@@ -19,52 +19,36 @@ def point_2_grid(points, variable_name='variable', long_name='variable', units="
 
     Parameters
     ----------
-    - points : GeoDataFrame or str
-        Input point data to be gridded. Can be either a GeoDataFrame or a path to a point shapefile (.shp).
-    - variable_name : str, optional
-        Name of the variable to include in the netCDF attributes metadata. Defaults to:
+    - points : GeoDataFrame or str. Input point data to be gridded. Can be either a GeoDataFrame or a path to a point shapefile (.shp).
+    - variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
         - The unique entries in the `attr_field` column if specified.
         - The input filename without extension if `attr_field` and `variable_name` are not specified.
-    - long_name : str, optional
-        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
+    - long_name : str, optional. A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
         `attr_field` is specified. Defaults to the input filename without extension if unspecified.
-    - units : str, optional
-        Units of the data variable to include in the netCDF metadata. Default is "value/grid-cell".
-    - source : str, optional
-        String describing the original source of the input data. This will be added to the netCDF metadata.
-    - time : str, optional
-        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
+    - units : str, optional. Units of the data variable to include in the netCDF metadata. Default is "value/grid-cell".
+    - source : str, optional. String describing the original source of the input data. This will be added to the netCDF metadata.
+    - time : str, optional. Time dimension for the output netCDF. If specified, the output will include a time dimension with the
         value provided. Default is None (spatial, 2D netCDF output).
-    - resolution : float, optional
-        Desired resolution for the grid cells in the output dataset. Default is 1 degree.
-    - agg_column : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
+    - resolution : float, optional. Desired resolution for the grid cells in the output dataset. Default is 1 degree.
+    - agg_column : str, optional. Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
         Defaults to counting the number of points per grid cell.
-    - agg_function : str, optional
-        Aggregation method for combining values in each grid cell. Options include:
+    - agg_function : str, optional. Aggregation method for combining values in each grid cell. Options include:
         - 'sum' (default): Sums all point values.
         - 'max': Takes the maximum value.
         - 'min': Takes the minimum value.
         - 'std': Computes the standard deviation.
-    - attr_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
-    - output_directory : str, optional
-        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
-    - output_filename : str, optional
-        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+    - attr_field : str, optional. Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
+    - output_directory : str, optional. Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
+    - output_filename : str, optional. Name of the output NetCDF file (without the `.nc` extension). If not provided:
         - Uses the input shapefile name if a shapefile path is given.
         - Saves as `"gridded_points.nc"` if a GeoDataFrame is provided as input.
-    - normalize_by_area : bool, optional
-        If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
-    - zero_is_value : bool, optional
-        If True, treats zero values as valid data rather than as no-data. Default is False.
-    - verbose : bool, optional
-        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+    - normalize_by_area : bool, optional. If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
+    - zero_is_value : bool, optional. If True, treats zero values as valid data rather than as no-data. Default is False.
+    - verbose : bool, optional. If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
 
     Returns
     -------
-    netCDF file
-        Transformed netCDF file with gridded data derived from the input point data.
+    - xarray.Dataset. Transformed dataset with gridded data derived from the input point data.
 
     Notes
     -----
@@ -76,7 +60,7 @@ def point_2_grid(points, variable_name='variable', long_name='variable', units="
     -------
     >>> point_2_grid(points=shapefile_path, 
     ...             variable_name="airplanes", 
-    ...             long_name=Airplanes Count", 
+    ...             long_name="Airplanes Count", 
     ...             units="airport/grid-cell", 
     ...             source="CIA", 
     ...             resolution=1,
@@ -185,51 +169,37 @@ def line_2_grid(lines, variable_name='variable', long_name='variable', units="me
 
     Parameters
     ----------
-    - lines : GeoDataFrame or str
-        Input lines data to be gridded. Can be either a GeoDataFrame or a path to a line/polyline shapefile (.shp).
-    - variable_name : str, optional
-        Name of the variable to include in the netCDF attributes metadata. Defaults to:
+    - lines : GeoDataFrame or str. Input lines data to be gridded. Can be either a GeoDataFrame or a path to a line/polyline shapefile (.shp).
+    - variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
         - The unique entries in the `attr_field` column if specified.
         - The input filename without extension if `attr_field` and `variable_name` are not specified.
-    - long_name : str, optional
-        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
+    - long_name : str, optional. A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
         `attr_field` is specified. Defaults to the input filename without extension if unspecified.
-    - units : str, optional
-        Units of the data variable to include in the netCDF metadata. Default is "meter/grid-cell".
-    - source : str, optional
-        String describing the original source of the input data. This will be added to the netCDF metadata.
-    - time : str, optional
-        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
+    - units : str, optional. Units of the data variable to include in the netCDF metadata. Default is "meter/grid-cell".
+    - source : str, optional. String describing the original source of the input data. This will be added to the netCDF metadata.
+    - time : str, optional. Time dimension for the output netCDF. If specified, the output will include a time dimension with the
         value provided. Default is None (spatial, 2D netCDF output).
-    - resolution : float, optional
-        Desired resolution for the grid cells in the output dataset. Default is 1 degree.
-    - agg_column : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
+    - resolution : float, optional. Desired resolution for the grid cells in the output dataset. Default is 1 degree.
+    - agg_column : str, optional. Column name in the shapefile or GeoDataFrame specifying the values to aggregate in each grid cell.
         Defaults to summing the lengths of intersected lines per grid cell.
-    - agg_function : str, optional
-        Aggregation method for combining values in each grid cell. Options include:
+    - agg_function : str, optional. Aggregation method for combining values in each grid cell. Options include:
         - 'sum' (default): Sums all line values.
         - 'max': Takes the maximum value.
         - 'min': Takes the minimum value.
         - 'std': Computes the standard deviation.
-    - attr_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
-    - output_directory : str, optional
-        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
-    - output_filename : str, optional
-        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+    - attr_field : str, optional. Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
+    - output_directory : str, optional. Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
+    - output_filename : str, optional. Name of the output NetCDF file (without the `.nc` extension). If not provided:
         - Uses the input shapefile name if a shapefile path is given.
         - Saves as `"gridded_lines.nc"` if a GeoDataFrame is provided as input.
-    - normalize_by_area : bool, optional
-        If True, normalizes the variable in each grid cell by the area of the grid cell (e.g., converts to value per square meter). Default is False.
-    - zero_is_value : bool, optional
+    - normalize_by_area : bool, optional. If True, normalizes the variable in each grid cell by the area of the grid cell (e.g., converts to value per square meter). Default is False.
+    - zero_is_value : bool, optional.   If True, treats zero values as valid data rather than as no-data. Default is False.
         If True, treats zero values as valid data rather than as no-data. Default is False.
-    - verbose : bool, optional
-        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+    - verbose : bool, optional. If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
 
     Returns
     -------
-    - xarray.Dataset, Transformed netCDF file with gridded data derived from the input line data.
+    - xarray.Dataset. Transformed dataset with gridded data derived from the input line data.
 
     Notes
     -----
@@ -244,8 +214,7 @@ def line_2_grid(lines, variable_name='variable', long_name='variable', units="me
     ...             variable_name="roads", 
     ...             long_name="Roads Length", 
     ...             units="meter/grid-cell", 
-    ...             source="OpenStreetMap", 
-    ...             time=None, 
+    ...             source="OpenStreetMap",  
     ...             resolution=1,
     ...             agg_function="sum", 
     ...             verbose=True)
@@ -358,51 +327,35 @@ def poly_2_grid(polygons, variable_name='variable', long_name='variable', units=
 
     Parameters
     ----------
-    - polygons : GeoDataFrame or str
-        Input polygons data to be gridded. Can be either a GeoDataFrame or a path to a polygons shapefile (.shp).
-    - variable_name : str, optional
-        Name of the variable to include in the netCDF attributes metadata. Defaults to:
+    - polygons : GeoDataFrame or str. Input polygons data to be gridded. Can be either a GeoDataFrame or a path to a polygons shapefile (.shp).
+    - variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
         - The unique entries in the `attr_field` column if specified.
         - The input filename without extension if `attr_field` and `variable_name` are not specified.
-    - long_name : str, optional
-        A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
+    - long_name : str, optional. A descriptive name for the variable, added to the netCDF metadata. Behaves the same as `variable_name` if
         `attr_field` is specified. Defaults to the input filename without extension if unspecified.
-    - units : str, optional
-        Units of the data variable to include in the netCDF metadata. Default is "m2/grid-cell".
-    - source : str, optional
-        String describing the original source of the input data. This will be added to the netCDF metadata.
-    - time : str, optional
-        Time dimension for the output netCDF. If specified, the output will include a time dimension with the
+    - units : str, optional. Units of the data variable to include in the netCDF metadata. Default is "m2/grid-cell".
+    - source : str, optional. String describing the original source of the input data. This will be added to the netCDF metadata.
+    - time : str, optional. Time dimension for the output netCDF. If specified, the output will include a time dimension with the
         value provided. Default is None (spatial, 2D netCDF output).
-    - resolution : float, optional
-        Desired resolution for the grid cells in the output dataset. Default is 1 degree.
-    - attr_field : str, optional
-        Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
-    - fraction : bool, optional
-        If True, calculates the fraction of each polygon within each grid cell. The output values will range from 0 to 1.
-        Default is False.
-    - agg_function : str, optional
-        Aggregation method for combining values in each grid cell. Default is 'sum'. Options include:
+    - resolution : float, optional. Desired resolution for the grid cells in the output dataset. Default is 1 degree.
+    - attr_field : str, optional. Column name in the shapefile or GeoDataFrame specifying the variable names for multiple data types.
+    - fraction : bool, optional. If True, calculates the fraction of each polygon within each grid cell. The output values will range from 0 to 1. Default is False.
+    - agg_function : str, optional. Aggregation method for combining values in each grid cell. Default is 'sum'. Options include:
         - 'sum': Sum of values.
         - 'max': Maximum value.
         - 'min': Minimum value.
         - 'std': Standard deviation.
-    - output_directory : str, optional
-        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
-    - output_filename : str, optional
-        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+    - output_directory : str, optional. Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
+    - output_filename : str, optional. Name of the output NetCDF file (without the `.nc` extension). If not provided:
         - Uses the input shapefile name if a shapefile path is given.
         - Saves as `"gridded_polygons.nc"` if a GeoDataFrame is provided as input.
-    - normalize_by_area : bool, optional
-        If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
-    - zero_is_value : bool, optional
-        If True, treats zero values as valid data rather than as no-data. Default is False.
-    - verbose : bool, optional
-        If True, prints information about the process, such as global sum of values before and after gridding. Default is False.
+    - normalize_by_area : bool, optional. If True, normalizes the grid values by area (e.g., converts to value per square meter). Default is False.
+    - zero_is_value : bool, optional. If True, treats zero values as valid data rather than as no-data. Default is False.
+    - verbose : bool, optional. If True, prints information about the process, such as global sum of values before and after gridding. Default is False.    
 
     Returns
     -------
-    - xarray.Dataset, Transformed netCDF file with gridded data derived from the input polygon data.
+    - xarray.Dataset. Transformed dataset with gridded data derived from the input polygon data.
 
     Notes
     -----
@@ -531,42 +484,27 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
 
     Parameters
     ----------
-    - raster_path : str
-        Path to the input raster data file. This can be either a TIFF or netCDF file.
-    - agg_function : str
-        Aggregation method to apply when re-gridding. Supported values are 'SUM', 'MEAN', or 'MAX'.
-    - variable_name : str
-        Name of the variable to include in the output dataset.
-    - long_name : str
-        Descriptive name for the variable.
-    - units : str, optional
-        Units for the variable. Default is "value/grid-cell".
-    - source : str, optional
-        Source information for the dataset. Default is None.
-    - time : str or None, optional
-        Time stamp or identifier for the data. Default is None.
-    - resolution : int or float, optional
-        Desired resolution of the grid cells in degree in the output dataset. Default is 1.
-    - netcdf_variable : str, optional
-        Name of the variable to extract from the netCDF file, if applicable. Required for netCDF inputs.
-    - output_directory : str, optional
-        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
-    - output_filename : str, optional
-        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+    - raster_path : str. Path to the input raster data file. This can be either a TIFF or netCDF file.
+    - agg_function : str. Aggregation method to apply when re-gridding. Supported values are 'SUM', 'MEAN', or 'MAX'.
+    - variable_name : str. Name of the variable to include in the output dataset.
+    - long_name : str. Descriptive name for the variable.
+    - units : str, optional. Units for the variable. Default is "value/grid-cell".
+    - source : str, optional. Source information for the dataset. Default is None.
+    - time : str or None, optional. Time stamp or identifier for the data. Default is None.
+    - resolution : int or float, optional. Desired resolution of the grid cells in degree in the output dataset. Default is 1.
+    - netcdf_variable : str, optional. Name of the variable to extract from the netCDF file, if applicable. Required for netCDF inputs.
+    - output_directory : str, optional. Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
+    - output_filename : str, optional. Name of the output NetCDF file (without the `.nc` extension). If not provided:
         - Uses `variable_name` if it is specified.
         - Defaults to `regridded.nc` if none of the above are provided.
-    - padding : str, optional
-        Padding strategy ('symmetric' or 'end').
-    - zero_is_value : bool, optional
-        Whether to treat zero values as valid data rather than as no-data. Default is False.
-    - normalize_by_area : bool, optional
-        Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
-    - verbose : bool, optional
-        If True, prints the global sum of values before and after re-gridding. Default is False.
+    - padding : str, optional. Padding strategy ('symmetric' or 'end').
+    - zero_is_value : bool, optional. Whether to treat zero values as valid data rather than as no-data. Default is False.
+    - normalize_by_area : bool, optional. Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
+    - verbose : bool, optional. If True, prints the global sum of values before and after re-gridding. Default is False.
 
     Returns
     -------
-    - xarray.Dataset, Re-gridded xarray dataset containing the processed raster data.
+    - xarray.Dataset. Re-gridded xarray dataset containing the processed raster data.
 
     Notes
     -----
@@ -632,51 +570,31 @@ def table_2_grid(surrogate_file, surrogate_variable, tabular_file, tabular_colum
 
     Parameters:
     -----------
-    - surrogate_file : xarray.Dataset or str
-        xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded 
+    - surrogate_file : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded 
         into an xarray.Dataset. The dataset must include the variable specified in `surrogate_variable`.
-    - surrogate_variable : str
-        Variable name in the NetCDF or xarray dataset used for spatial distribution.
-    - tabular_file : pandas.DataFrame or str
-        Tabular dataset as a pandas DataFrame or a path to a CSV file. If a file path is provided, it will be 
+    - surrogate_variable : str. Variable name in the NetCDF or xarray dataset used for spatial distribution.
+    - tabular_file : pandas.DataFrame or str. Tabular dataset as a pandas DataFrame or a path to a CSV file. If a file path is provided, it will be 
         automatically loaded into a DataFrame. The data must include a column named "ISO3" representing country codes. 
         If not present, use the `add_iso3_column` utility function to convert country names to ISO3 codes.     
-    - tabular_column : str
-        Column name in the tabular dataset with values to be spatially distributed.
-    - variable_name : str, optional
-        Name of the variable. Default is None.
-    - long_name : str, optional
-        A long name for the variable. Default is None.
-    - units : str, optional
-        Units of the variable. Default is 'value/grid'.
-    - source : str, optional
-        Source information, if available. Default is None.
-    - filename : str, optional
-        Additional name for the output raster file. If None, a default name will be used.
-    - time : str, optional
-        Time information for the dataset.
-    - output_directory : str, optional
-        Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
-    - output_filename : str, optional
-        Name of the output NetCDF file (without the `.nc` extension). If not provided:
+    - tabular_column : str. Column name in the tabular dataset with values to be spatially distributed.
+    - variable_name : str, optional. Name of the variable. Default is None.
+    - long_name : str, optional. A long name for the variable. Default is None.
+    - units : str, optional. Units of the variable. Default is 'value/grid'.
+    - source : str, optional. Source information, if available. Default is None.
+    - time : str, optional. Time information for the dataset.
+    - output_directory : str, optional. Directory where the output NetCDF file will be saved. If None, but output_filename is True, the file will be saved in the current working directory.
+    - output_filename : str, optional. Name of the output NetCDF file (without the `.nc` extension). If not provided:
         - Uses `variable_name` if it is specified.
         - Falls back to `long_name` or `tabular_column` if `variable_name` is not given.
         - Defaults to `gridded_table.nc` if none of the above are provided.
-    - zero_is_value: bool, optional
-        If the value is True, then the function will treat zero as an existent value and 0 values will be
-        considered while calculating mean and STD.
-    - normalize_by_area : bool, optional
-        Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
-    - eez : bool, optional
-        If set to True, the function converts the jurisdictional Exclusive Economic Zone (EEZ) values to a spatial grid.
-    - verbose: bool, optional
-        If True, the global gridded sum of before and after re-gridding operation will be printed. If any
-        jurisdiction where surrogate variable is missing and tabular data is evenly distributed over the
-        jurisdiction, the ISO3 codes of evenly distributed countries will also be printed.
+    - zero_is_value: bool, optional. If the value is True, then the function will treat zero as an existent value and 0 values will be considered while calculating mean and STD.
+    - normalize_by_area : bool, optional. Whether to normalize grid values by area (e.g., convert to value per square meter). Default is False.
+    - eez : bool, optional. If set to True, the function converts the jurisdictional Exclusive Economic Zone (EEZ) values to a spatial grid.
+    - verbose: bool, optional. If True, the global gridded sum of before and after re-gridding operation will be printed. If any jurisdiction where surrogate variable is missing and tabular data is evenly distributed over the jurisdiction, the ISO3 codes of evenly distributed countries will also be printed.
 
     Returns:
     --------
-    - xarray.Dataset, Resulting gridded dataset after spatial distribution of tabular values.
+    - xarray.Dataset. Resulting gridded dataset after spatial distribution of tabular values.
 
     Example
     -------
@@ -789,53 +707,22 @@ def grid_2_table(grid_file, variables=None, time=None, grid_area=None, resolutio
 
     Parameters:
     -----------
-    - grid_file : xarray.Dataset or str
-        xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
-    - variables : str, optional
-        Variables name to be processed. It can either be one variable or list of variables. If None, all variables in the dataset (excluding predefined ones) will be considered.
-    - time : str, optional
-        Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
-    - resolution : float, optional
-        Resolution of gridded data in degree. Default is 1 degree.
-    - grid_area : str, optional
-        Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
-    - aggregation : str, optional
-        Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
-    - agg_function : str, optional, default 'sum'
-        Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.  
+    - grid_file : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - variables : str, optional. Variables name to be processed. It can either be one variable or list of variables. If None, all variables in the dataset (excluding predefined ones) will be considered.
+    - time : str, optional. Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
+    - resolution : float, optional. Resolution of gridded data in degree. Default is 1 degree.
+    - grid_area : str, optional. Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
+    - aggregation : str, optional. Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
+    - agg_function : str, optional, default 'sum'. Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.  
+    - verbose : bool, optional. If True, the function will print the global sum of values before and after aggregation.
+
     Returns:
     --------
-    df : pandas DataFrame
-        Tabular data for different jurisdictions, including ISO3 codes, variable values, and optional 'Year' column.
+    df : pandas DataFrame. Tabular data for different jurisdictions, including ISO3 codes, variable values, and optional 'Year' column.
     """
 
     df = utils.grid_2_table(grid_file=grid_file, variables=variables, time=time, grid_area=grid_area, resolution=resolution, aggregation=aggregation, method=agg_function, verbose=verbose)
     return df
-
-def get_netcdf_info(netcdf_file, variable_name=None):
-    """
-    Extract information about variables and dimensions from a NetCDF dataset.
-
-    Parameters
-    ----------
-    - netcdf_file : xarray.Dataset or str
-        xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
-    - variable_name : str, optional
-        The prefix or complete name of the variable to filter. If not provided, all variables are included.
-
-    Returns
-    -------
-    - tuple, A tuple containing lists of dimensions, short names, long names, units, & time values (if 'time' exists).
-        
-    Example
-    -------
-    >>> get_netcdf_info(netcdf_file=netcdf_file_path, 
-    ...                 variable_name="railway_length"
-    ... )
-    """
-
-    netcdf_info = get.get_netcdf_info(netcdf_file=netcdf_file, variable_name=variable_name)
-    return netcdf_info
 
 def add_iso3_column(df, column):
     """
@@ -901,7 +788,7 @@ def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None
     - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_histogram.png".
     
     Returns:
-    - None, displays the plot.
+    - None, displays the plot and optionally saves it to a file.
 
     Example
     -------
@@ -936,7 +823,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_l
     - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_scatter.png".
     
     Returns:
-    - None, displays the plot.
+    - None, displays the plot and optionally saves it to a file.
 
     Example
     -------
@@ -972,7 +859,7 @@ def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', co
     - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_time_series.png".
     
     Returns:
-    - None, displays the plot.
+    - None, displays the plot and optionally saves it to a file.
 
     Example
     -------
@@ -1011,7 +898,7 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     - filename : str, optional, Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_hexbin.png".
     
     Returns:
-    - None, displays the plot.
+    - None, displays the map and optionally saves it to a file.
     Example
     -------
     >>> plot_hexbin(variable1="roads_gross", 
@@ -1032,36 +919,21 @@ def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vm
 
     Parameters
     ----------
-    variable : str
-        Name of the variable in the xarray Dataset to plot.
-    dataset : xarray.Dataset, or str
-        xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
-    color : str, default 'hot_r'
-        Matplotlib colormap name for the plot (discrete color scale).
-    title : str, default ''
-        Title of the map.
-    label : str, default ''
-        Label for the colorbar.
-    vmin : float, optional
-        Minimum data value for the colorbar range. If not provided, the minimum of the variable is used.
-    vmax : float, optional
-        Maximum data value for the colorbar range. If not provided, the maximum of the variable is used.
-    extend_min : bool, default False
-        If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
-    extend_max : bool, default False
-        If True, includes values above `vmax` in the last color class and shows a right arrow on the colorbar.
-    levels : int or list of float, default 10
-        Either the number of color intervals or a list of explicit interval boundaries.
-    out_bound : bool, default True
-        Whether to display the outer boundary (spine) of the map projection.
-    remove_ata : bool, default False
-        If True, removes Antarctica from the map by excluding data below 60°S latitude.
-    output_dir : str, optional
-        Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
-    filename : str, optional
-        Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_plot.png".
-    show: bool, True
-        Whether or not show the map
+    - variable : str. Name of the variable in the xarray Dataset to plot.
+    - dataset : xarray.Dataset. or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - color : str, default 'hot_r'. Matplotlib colormap name for the plot (discrete color scale).
+    - title : str, default ''. Title of the map.
+    - label : str, default ''. Label for the colorbar.
+    - vmin : float, optional. Minimum data value for the colorbar range. If not provided, the minimum of the variable is used.
+    - vmax : float, optional. Maximum data value for the colorbar range. If not provided, the maximum of the variable is used.
+    - extend_min : bool, default False. If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
+    - extend_max : bool, default False. If True, includes values above `vmax` in the last color class and shows a right arrow on the colorbar.
+    - levels : int or list of float, default 10. Either the number of color intervals or a list of explicit interval boundaries.
+    - out_bound : bool, default True. Whether to display the outer boundary (spine) of the map projection.
+    - remove_ata : bool, default False. If True, removes Antarctica from the map by excluding data below 60°S latitude.
+    - output_dir : str, optional. Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    - filename : str, optional. Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_plot.png".
+    - show : bool, True. Whether or not show the map
 
     Notes
     -----
@@ -1070,14 +942,9 @@ def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vm
     - Tick formatting on the colorbar is:
         - Two decimal places if (vmax - vmin) <= 10.
     - If `remove_ata` is True, the colorbar is placed slightly higher to avoid overlap with the map.
-
-    Raises
-    ------
-    ValueError
-        If both or neither of `dataset` and `netcdf_directory` are provided.
         
     Returns:
-    - Axes class of the map.
+    - Axes class of the map, optionally displays the map and saves it to a file.
 
     Example
     -------
@@ -1107,41 +974,22 @@ def plot_country(tabular_file, column, title="", label="", color='viridis', leve
 
     Parameters:
     -----------
-    - tabular_file : pandas.DataFrame or str
-        Input table containing country-level data. Can be either:
+    - tabular_file : pandas.DataFrame or str. Input table containing country-level data. Can be either:
         - A pandas DataFrame with the required `column`
         - A string path to a CSV file, which will be automatically read into a DataFrame
-    - column : str
-        Name of the column in the dataframe to visualize.
-    - title : str, optional
-        Title of the map. Default is an empty string.
-    - label : str, optional
-        Label for the colorbar. Default is an empty string.
-    - color : str, optional
-        Name of the matplotlib colormap to use. Default is 'viridis'.
-    - levels : int or list of float, optional
-        Number of color levels (if int) or list of bin edges (if list). Default is 10.
-    - remove_ata : bool, optional
-        Whether to remove Antarctica ('ATA') from the data. Default is False.
-    - out_bound : bool, optional
-        Whether to display map boundaries (spines). Default is True.
-    - vmin : float or None, optional
-        Minimum value for the colormap. If None, calculated from the data.
-    - vmax : float or None, optional
-        Maximum value for the colormap. If None, calculated from the data.
-    - extend_min : bool, optional
-        Whether to extend the colorbar below `vmin`. Default is False.
-    - extend_max : bool, optional
-        Whether to extend the colorbar above `vmax`. Default is False.
-    - output_dir : str, optional
-        Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
-    - filename : str, optional
-        Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_country_plot.png".
-
-    Raises:
-    -------
-    ValueError
-        If neither `dataframe` nor `csv_path` is provided, or if both are provided.
+    - column : str. Name of the column in the dataframe to visualize.
+    - title : str, optional. Title of the map. Default is an empty string.
+    - label : str, optional. Label for the colorbar. Default is an empty string.
+    - color : str, optional. Name of the matplotlib colormap to use. Default is 'viridis'.
+    - levels : int or list of float, optional. Number of color levels (if int) or list of bin edges (if list). Default is 10.
+    - remove_ata : bool, optional. Whether to remove Antarctica ('ATA') from the data. Default is False.
+    - out_bound : bool, optional. Whether to display map boundaries (spines). Default is True.
+    - vmin : float or None, optional. Minimum value for the colormap. If None, calculated from the data.
+    - vmax : float or None, optional. Maximum value for the colormap. If None, calculated from the data.
+    - extend_min : bool, optional. Whether to extend the colorbar below `vmin`. Default is False.
+    - extend_max : bool, optional. Whether to extend the colorbar above `vmax`. Default is False.
+    - output_dir : str, optional. Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
+    - filename : str, optional. Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_country_plot.png".
 
     Returns:
     --------
@@ -1167,13 +1015,13 @@ def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
     zeros back to NaNs.
     
     Parameters:
-    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variables: list of str, the names of the variables to sum. If None, sum all variables except those starting with 'grid_area' and 'land_frac'.
     - new_variable_name: str, optional, the name of the new variable to store the sum.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
-    - xarray.Dataset, with the summed variable.
+    - xarray.Dataset. with the summed variable.
 
     Example
     -------
@@ -1195,12 +1043,12 @@ def subtract_variables(variable1, variable2, dataset, new_variable_name=None, ti
     Parameters:
     - variable1: str, the name of the variable to subtract from.
     - variable2: str, the name of the variable to subtract.
-    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - new_variable_name: str, optional, the name of the new variable to store the result.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
-    - xarray.Dataset, with the resulting variable.
+    - xarray.Dataset. with the resulting variable.
 
     Example
     -------
@@ -1221,12 +1069,12 @@ def divide_variables(variable1, variable2, dataset, new_variable_name=None, time
     Parameters:
     - variable1: str, the name of the variable to be divided (numerator).
     - variable2: str, the name of the variable to divide by (denominator).
-    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - new_variable_name: str, optional, the name of the new variable to store the result.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
-    - xarray.Dataset, with the resulting variable.
+    - xarray.Dataset. with the resulting variable.
 
     Example
     -------
@@ -1245,13 +1093,13 @@ def multiply_variables(dataset, variables=None, new_variable_name=None, time=Non
     Fill NaNs with one before multiplying, and convert resulting ones back to NaNs.
     
     Parameters:
-    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variables: list of str, the names of the variables to multiply. If None, multiply all variables, excluding the "grid_area" and "land_frac" variables included in the dataset.
     - new_variable_name: str, optional, the name of the new variable to store the product.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
-    - xarray.Dataset, with the resulting variable.
+    - xarray.Dataset. with the resulting variable.
 
     Example
     -------
@@ -1273,13 +1121,13 @@ def average_variables(dataset, variables=None, new_variable_name=None, time=None
     zeros back to NaNs.
     
     Parameters:
-    - dataset: xarray.Dataset, or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variables: list of str, the names of the variables to average. If None, average all variables except those starting with 'grid_area' and 'land_frac'.
     - new_variable_name: str, optional, the name of the new variable to store the average.
     - time: optional, a specific time slice to select from the dataset.
     
     Returns:
-    - xarray.Dataset, with the averaged variable.
+    - xarray.Dataset. with the averaged variable.
 
         Example
     -------
@@ -1290,3 +1138,26 @@ def average_variables(dataset, variables=None, new_variable_name=None, time=None
     """
     ds = calculate.average_variables(dataset, variables, new_variable_name, time)
     return ds
+
+def get_netcdf_info(netcdf_file, variable_name=None):
+    """
+    Extract information about variables and dimensions from a NetCDF dataset.
+
+    Parameters
+    ----------
+    - netcdf_file : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - variable_name : str, optional. The prefix or complete name of the variable to filter. If not provided, all variables are included.
+
+    Returns
+    -------
+    - tuple, A tuple containing lists of dimensions, short names, long names, units, & time values (if 'time' exists).
+        
+    Example
+    -------
+    >>> get_netcdf_info(netcdf_file=netcdf_file_path, 
+    ...                 variable_name="railway_length"
+    ... )
+    """
+
+    netcdf_info = get.get_netcdf_info(netcdf_file=netcdf_file, variable_name=variable_name)
+    return netcdf_info
