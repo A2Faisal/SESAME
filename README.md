@@ -8,8 +8,8 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ## 📑 Table of Contents
 
-- [Goals](#-goals)
-- [Example Tools](#️-example-tools)
+- [Goals](#goals)
+- [Example Tools](#example-tools)
   - [point_2_grid](#point_2_grid)
   - [line_2_grid](#line_2_grid)
   - [poly_2_grid](#poly_2_grid)
@@ -18,9 +18,9 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
   - [add_iso3_column](#add_iso3_column)
   - [grid_2_table](#grid_2_table)
   - [Built-in plotting functions](#built-in-plotting-functions)
-- [Human-Earth Atlas](#-human-earth-atlas)
-- [Software Documentation](#-software-documentation)
-- [Installation Instructions](#-installation-instructions)
+- [Human-Earth Atlas](#human-earth-atlas)
+- [Software Documentation](#software-documentation)
+- [Installation Instructions](#installation-instructions)
 - [Contact](#contact)
 
 ---
