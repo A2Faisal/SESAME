@@ -1,6 +1,6 @@
-# 🌱 SESAME Project
+# SESAME Project
 
-## 🌍 About
+## About
 
 The **SESAME project** aims to unify key human and non-human (Earth system) datasets into a shared spatially-gridded format. These datasets are often siloed in incompatible formats; SESAME bridges that gap to accelerate scientific discovery and interdisciplinary modeling.
 
@@ -27,7 +27,7 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ---
 
-## 🎯 Goals
+## Goals
 
 - Unify human and non-human system datasets in a standardized spatially-gridded structure.
 - Improve data discoverability and interoperability for research and modeling.
@@ -35,7 +35,7 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ---
 
-## 🛠️ Example Tools
+## Example Tools
 
 - **`point_2_grid`**  
   Maps point data onto standardized global grids. Supports counting points per cell, summing or averaging associated values, or grouping by class to generate multi-variable datasets.
@@ -63,30 +63,27 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ---
 
-## 🗺️ Human-Earth Atlas
+## Human-Earth Atlas
 
-📂 **Atlas Data Access and Citation**:
+**Atlas Data Access**:
 
 Faisal, A. A., Kaye, M., Ahmed, M. & Galbraith, E. _The SESAME Human-Earth Atlas_. figshare [https://doi.org/10.6084/m9.figshare.28432499](https://doi.org/10.6084/m9.figshare.28432499) (2025).  
 
-
----
-
-## 📄 Publications
+**Paper**
 
 Faisal, A.A., Kaye, M., Ahmed, M. et al. (2025)._The SESAME Human-Earth Atlas_. *Scientific Data*, 12, 775. [https://doi.org/10.1038/s41597-025-05087-5](https://doi.org/10.1038/s41597-025-05087-5)
 
 ---
 
-## 📚 Software Documentation
+## Software Documentation
 
 Detailed setup, usage instructions, advanced features, and testing procedures are included in the official software manual:
 
-📄 [**SESAME Software Manual (v1.1)**](https://github.com/A2Faisal/SESAME/blob/main/docs/SESAME-Software_Manual_v1.1.pdf)
+📄 [**SESAME Software Manual (v1.1)**](https://a2faisal.github.io/SESAME/)
 
 ---
 
-## ⚙️ Installation Instructions
+## Installation Instructions
 
 If you're using **conda** to manage your Python environment:
 
@@ -118,36 +115,6 @@ import sesame as ssm
 
 ![Visual Studio Build Tools Installation](https://github.com/A2Faisal/SESAME/blob/main/docs/images/vs_build_tools.png)
 
-## 🧪 Testing SESAME
-
-To verify the functionality of the SESAME toolbox, a Jupyter notebook is provided:
-
-📓 [Test Notebook: `test/test_sesametoolbox.ipynb`](https://github.com/A2Faisal/SESAME/blob/main/test/test_sesametoolbox.ipynb)
-
-This notebook demonstrates core features using sample datasets located in:
-
-📁 [Test Data: `test/data/`](https://github.com/A2Faisal/SESAME/tree/main/test/data)
-
-### 📌 To run the test:
-
-1. Make sure your environment is activated:
-    ```bash
-    conda activate sesame_env
-    ```
-
-2. Install Jupyter (if you haven't already):
-    ```bash
-    conda install jupyter
-    ```
-
-3. Launch the notebook:
-    ```bash
-    jupyter notebook test/test_sesametoolbox.ipynb
-    ```
-
-4. Follow the instructions in the notebook to run sample tests.
-
-> 🔍 **Note:** Ensure that all paths in the notebook refer to `test/data/` correctly. The folder structure must be preserved when cloning or downloading the repository.
 
 ## Contact
 For questions or inquiries about the SESAME project, please contact [abdullah-al.faisal@mail.mcgill.ca](mailto:abdullah-al.faisal@mail.mcgill.ca) or [maxwell.kaye@mail.mcgill.ca](mailto:maxwell.kaye@mail.mcgill.ca).

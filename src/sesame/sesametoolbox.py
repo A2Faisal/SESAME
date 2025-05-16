@@ -1,3 +1,41 @@
+"""
+SESAME is an open-source Python tool designed to make spatial data analysis, visualization, and exploration accessible to all.  
+Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock insights from geospatial data with just a few lines of code.
+
+---
+
+**What can you do with the SESAME toolbox?**
+
+- Conveniently process, analyze, and visualize spatial datasets (e.g., shapefiles, GeoTIFFs, CSVs with coordinates or country names).
+- Perform spatial operations such as overlay, intersection, and variable extraction.
+- Create publication-ready maps and plots.
+- Integrate with the Human-Earth Atlas to explore global patterns in Human-Earth systems.
+
+**Getting Started with the Human-Earth Atlas:**
+
+1. Install SESAME
+2. Download the Human-Earth Atlas ([Figshare Link](https://doi.org/10.6084/m9.figshare.28432499))
+3. Load your spatial data (e.g., land cover, population, climate)
+4. Use SESAME’s plotting tools to visualize and compare datasets
+5. Explore the Human-Earth Atlas by overlaying your data with global reference layers
+
+```python
+import sesame as ssm
+
+# Load your data
+netcdf_file = "atlas/T.transportation.roads.nc"
+
+# Plot with Human-Earth Atlas
+ssm.plot_map(variable="roads_gross", dataset=netcdf_file, color='magma_r', title='Gross Road Mass', label='g m-2', vmin=0, vmax=1e4, extend_max=True)
+```
+
+<img src="images/gross_road.png" alt="Gross Road Mass Map" width="400"/>
+
+Ready to get started? Dive into the function docs below or read [The SESAME Human-Earth Atlas](https://www.nature.com/articles/s41597-025-05087-5) paper for inspiration!
+
+---
+"""
+
 import os
 import geopandas as gpd
 import pandas as pd
@@ -11,47 +49,6 @@ from . import calculate
 from . import plot
 from . import get
 
-
-"""
-SESAME: software tools for integrating Human - Earth System data
-
-SESAME is an open-source Python tool designed to make spatial data analysis, visualization, and exploration accessible to all.  
-Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock insights from geospatial data with just a few lines of code.
-
----
-
-**What can you do with the SESAME toolbox?**
-
-- Effortlessly process, analyze, and visualize spatial datasets (e.g., shapefiles, GeoTIFFs, CSVs with coordinates or country names).
-- Perform spatial operations such as overlay, intersection, and variable extraction.
-- Create publication-ready maps and plots.
-- Integrate with the Human-Earth Atlas to explore global patterns in Human-Earth systems.
-
-**Getting Started with the Human-Earth Atlas:**
-
-1. Install SESAME.
-2. Download the Human-Earth Atlas ([Figshare Link](https://doi.org/10.6084/m9.figshare.28432499))
-3. Load your spatial data (e.g., land cover, population, climate).
-4. Use SESAME’s plotting tools to visualize and compare datasets.
-5. Explore the Human-Earth Atlas by overlaying your data with global reference layers.
-
-_Example:_
-```python
-import sesame as ssm
-
-# Load your data
-netcdf_file = "atlas/T.transportation.roads.nc"
-
-# Plot with Human-Earth Atlas
-ssm.plot_map(variable="roads_gross", dataset=netcdf_file, color='magma_r', title='Gross Road Mass', label='g m-2', vmin=0, vmax=1e4, extend_max=True)
-```
-
-![Gross Road Mass Map](images/gross_road.png)
-
-Ready to get started? Dive into the function docs below or read [the SESAME Human-Earth Atlas](https://www.nature.com/articles/s41597-025-05087-5) for inspiration!
-
----
-"""
 
 def point_2_grid(points, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
     
@@ -810,7 +807,7 @@ def add_iso3_column(df, column):
             print(f"Country Not Found: {iso3_not_found}")
     return df
 
-def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None):
+def plot_histogram(dataset, variable, time=None, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None):
     
     """
     Create a histogram for an array variable in an xarray dataset.
@@ -819,6 +816,7 @@ def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None
     Parameters:
     - dataset : xarray.Dataset or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variable: str, the name of the variable to plot.
+    - time: str, optional, the time slice to plot.
     - bin_size: int, optional, the number of bins in the histogram.
     - color: str, optional, the color of the histogram bars.
     - plot_title: str, optional, the title for the plot.
@@ -840,9 +838,9 @@ def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None
     ...                plot_title="Histogram of Railway Length"
     ... )
     """
-    plot.plot_histogram(dataset, variable, bin_size, color, plot_title, x_label, remove_outliers, log_transform, output_dir, filename)
+    plot.plot_histogram(dataset, variable, time, bin_size, color, plot_title, x_label, remove_outliers, log_transform, output_dir, filename)
     
-def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
+def plot_scatter(variable1, variable2, dataset, dataset2=None, time=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
     """
     Create a scatter plot for two variables in an xarray dataset.
     Optionally remove outliers and apply log transformations.
@@ -852,6 +850,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_l
     - variable2 : str, name of the variable to be plotted on the y-axis. If `dataset2` is provided, this variable will be extracted from `dataset2`; otherwise, it must exist in `dataset`.
     - dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by `variable1`, which will be used for the x-axis.
     - dataset2 : xarray.Dataset or str, optional, a second dataset or a path to a NetCDF file containing the variable specified by `variable2` (for the y-axis). If not provided, `dataset` will be used for both variables.
+    - time: str, optional, the time slice to plot.
     - color: str, optional, the color map of the scatter plot.
     - x_label: str, optional, the label for the x-axis.
     - y_label: str, optional, the label for the y-axis.
@@ -879,7 +878,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_l
     ...             log_transform_2="log10"
     ... )
     """
-    plot.plot_scatter(variable1, variable2, dataset, dataset2, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename)
+    plot.plot_scatter(variable1, variable2, dataset, dataset2, time, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename)
     
 def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None):
     """
@@ -917,7 +916,7 @@ def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', co
     
     plot.plot_time_series(dataset, variable, agg_function, plot_type, color, plot_label, x_label, y_label, plot_title, smoothing_window, output_dir, filename)
 
-def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
+def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, time=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
     
     """
     Create a hexbin plot for two variables in an xarray dataset.
@@ -927,6 +926,7 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     - variable2 : str, name of the variable to be plotted on the y-axis. If `dataset2` is provided, this variable will be extracted from `dataset2`; otherwise, it must exist in `dataset`.
     - dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by `variable1`, which will be used for the x-axis.
     - dataset2 : xarray.Dataset or str, optional, a second dataset or a path to a NetCDF file containing the variable specified by `variable2` (for the y-axis). If not provided, `dataset` will be used for both variables.
+    - time: str, optional, the time slice to plot.
     - color: str, optional, the color map of the hexbin plot.
     - grid_size: int, optional, the number of hexagons in the x-direction.
     - x_label: str, optional, the label for the x-axis.
@@ -951,9 +951,9 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
     ... )
     """
     
-    plot.plot_hexbin(variable1, variable2, dataset, dataset2, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename)
+    plot.plot_hexbin(variable1, variable2, dataset, dataset2, time, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename)
     
-def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
+def plot_map(variable, dataset, time=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
     
     """
     Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
@@ -965,6 +965,7 @@ def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vm
     - color : str, default 'hot_r'. Matplotlib colormap name for the plot (discrete color scale).
     - title : str, default ''. Title of the map.
     - label : str, default ''. Label for the colorbar.
+    - time: str, optional, the time slice to plot.
     - vmin : float, optional. Minimum data value for the colorbar range. If not provided, the minimum of the variable is used.
     - vmax : float, optional. Maximum data value for the colorbar range. If not provided, the maximum of the variable is used.
     - extend_min : bool, default False. If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
@@ -1004,7 +1005,7 @@ def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vm
     ... )
     """
     
-    ax = plot.plot_map(variable=variable, dataset=dataset, color=color, title=title, label=label,
+    ax = plot.plot_map(variable=variable, dataset=dataset, time=time, color=color, title=title, label=label,
              vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max, levels=levels, 
              out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, show=show)
     return ax

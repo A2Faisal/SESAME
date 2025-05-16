@@ -17,10 +17,9 @@ from matplotlib.colors import ListedColormap
 import cartopy
 import seaborn as sns
 
-from . import calculate
 
 
-def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None):
+def plot_histogram(dataset, variable, time=None, bin_size=30, color='blue', plot_title=None, x_label=None, remove_outliers=False, log_transform=None, output_dir=None, filename=None):
     
     # Load netcdf_file (either path or xarray.Dataset)
     if isinstance(dataset, (str, bytes, os.PathLike)):
@@ -33,6 +32,10 @@ def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None
     # Ensure the specified variable is in the dataset
     if variable not in dataset:
         raise ValueError(f"Variable '{variable}' not found in the dataset.")
+    
+    # Handle time selection if provided
+    if time is not None:
+        dataset = dataset.sel(time=time, method='nearest').drop_vars('time')
         
     data = dataset[variable].values.flatten()
 
@@ -81,7 +84,7 @@ def plot_histogram(dataset, variable, bin_size=30, color='blue', plot_title=None
     
     plt.show()
 
-def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
+def plot_scatter(variable1, variable2, dataset, dataset2=None, time=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
 
     # Load dataset1
     if isinstance(dataset, (str, bytes, os.PathLike)):
@@ -103,7 +106,15 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_l
 
     if variable2 not in dataset2:
         raise ValueError(f"Variable '{variable2}' not found in the second dataset.")
-
+    
+    # Handle time selection if provided
+    if time is not None:
+        # Handle time selection for dataset1 if it has time dimension
+        if 'time' in dataset.dims:
+            dataset = dataset.sel(time=time, method='nearest').drop_vars('time')
+                    # Handle time selection for dataset2 if it has time dimension
+        if dataset2 is not None and 'time' in dataset2.dims:
+            dataset2 = dataset2.sel(time=time, method='nearest').drop_vars('time')
     # Extract data
     data1 = dataset[variable1].values.flatten()
     data2 = dataset2[variable2].values.flatten()
@@ -195,7 +206,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, color='blue', x_l
         plt.savefig(save_path, dpi=600, bbox_inches='tight')
     plt.show()
 
-def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
+def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, time=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
     
     # Load dataset1
     if isinstance(dataset, (str, bytes, os.PathLike)):
@@ -217,6 +228,15 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, color='pink_r
 
     if variable2 not in dataset2:
         raise ValueError(f"Variable '{variable2}' not found in the second dataset.")
+
+    # Handle time selection if provided
+    if time is not None:
+        # Handle time selection for dataset1 if it has time dimension
+        if 'time' in dataset.dims:
+            dataset = dataset.sel(time=time, method='nearest').drop_vars('time')
+                    # Handle time selection for dataset2 if it has time dimension
+        if dataset2 is not None and 'time' in dataset2.dims:
+            dataset2 = dataset2.sel(time=time, method='nearest').drop_vars('time')
 
     # Extract data
     data1 = dataset[variable1].values.flatten()
@@ -371,7 +391,7 @@ def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', co
         plt.savefig(save_path, dpi=600, bbox_inches='tight')
     plt.show()
 
-def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
+def plot_map(variable, dataset, time=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
     
     # Load netcdf_file (either path or xarray.Dataset)
     if isinstance(dataset, (str, bytes, os.PathLike)):
@@ -381,6 +401,8 @@ def plot_map(variable, dataset, color='hot_r', title='', label='', vmin=None, vm
     else:
         raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")   
     
+    if time is not None:
+        dataset = dataset.sel(time=time, method='nearest').drop_vars('time')
     # Ensure the specified variable is in the dataset
     if variable not in dataset:
         raise ValueError(f"Variable '{variable}' not found in the dataset.")
