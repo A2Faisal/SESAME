@@ -77,6 +77,8 @@ import sesame as ssm
 
 ![Visual Studio Build Tools Installation](https://github.com/A2Faisal/SESAME/blob/main/docs/images/vs_build_tools.png)
 
+---
+
 ## Dependencies
 
 - geopandas>=1.0.1
@@ -87,6 +89,14 @@ import sesame as ssm
 - seaborn>=0.13.2
 - scipy>=1.14.0
 - cartopy==0.23.0
+
+---
+
+## License
+
+[MIT License](https://github.com/A2Faisal/SESAME/blob/main/LICENSE)
+
+--- 
 
 ## Human-Earth Atlas
 
