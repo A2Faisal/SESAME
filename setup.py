@@ -6,8 +6,8 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     description="A simple Python package for Sesame toolbox",
-    author="Maxwell Kaye",
-    author_email="maxwell.kaye@mail.mcgill.ca",
+    author="Abdullah Al Faisal,Maxwell Kaye",
+    author_email="abdullah.al.faisal@mail.mcgill.ca, maxwell.kaye@mail.mcgill.ca",
     license="MIT",
     install_requires=[
 		"geopandas>=1.0.1",

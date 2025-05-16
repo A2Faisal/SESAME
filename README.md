@@ -19,10 +19,8 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
   - [grid_2_table](#grid_2_table)
   - [Built-in plotting functions](#built-in-plotting-functions)
 - [Human-Earth Atlas](#-human-earth-atlas)
-- [Publications](#-publications)
 - [Software Documentation](#-software-documentation)
 - [Installation Instructions](#-installation-instructions)
-- [Testing SESAME](#-testing-sesame)
 - [Contact](#contact)
 
 ---
