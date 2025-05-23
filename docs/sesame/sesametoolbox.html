@@ -80,6 +80,12 @@
             <li>
                     <a class="function" href="#get_netcdf_info">get_netcdf_info</a>
             </li>
+            <li>
+                    <a class="function" href="#atlas">atlas</a>
+            </li>
+            <li>
+                    <a class="function" href="#info">info</a>
+            </li>
     </ul>
 
 
@@ -103,34 +109,73 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 <p><strong>What can you do with the SESAME toolbox?</strong></p>
 
 <ul>
-<li>Conveniently process, analyze, and visualize spatial datasets (e.g., shapefiles, GeoTIFFs, CSVs with coordinates or country names).</li>
-<li>Perform spatial operations such as overlay, intersection, and variable extraction.</li>
+<li>Conveniently process and analyze both spatial datasets (e.g. GeoTIFFs) and tabular jurisdictional data (e.g. csv files by country) through a unified set of tools.</li>
+<li>Generate standardized netcdf files from a wide range of spatial input types (e.g. lines, points, polygons)</li>
 <li>Create publication-ready maps and plots.</li>
-<li>Integrate with the Human-Earth Atlas to explore global patterns in Human-Earth systems.</li>
+<li>Explore spatial and temporal patterns among hundreds of variables in the Human-Earth Atlas.</li>
 </ul>
 
 <p><strong>Getting Started with the Human-Earth Atlas:</strong></p>
 
 <ol>
-<li>Install SESAME</li>
+<li>Install SESAME*</li>
 <li>Download the Human-Earth Atlas (<a href="https://doi.org/10.6084/m9.figshare.28432499">Figshare Link</a>)</li>
 <li>Load your spatial data (e.g., land cover, population, climate)</li>
 <li>Use SESAME’s plotting tools to visualize and compare datasets</li>
 <li>Explore the Human-Earth Atlas by overlaying your data with global reference layers</li>
 </ol>
 
+<p>*Note: SESAME may take up to 2 minutes to load when used for the first time. This will not recur with further use.</p>
+
+<p><strong>Navigating the Atlas:</strong></p>
+
+<ol>
+<li>List the netCDF files in the“Human–Earth Atlas”</li>
+</ol>
+
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="kn">import</span> <span class="nn">sesame</span> <span class="k">as</span> <span class="nn">ssm</span>
+<span class="n">ssm</span><span class="o">.</span><span class="n">atlas</span><span class="p">(</span><span class="n">directory</span><span class="o">=</span><span class="n">atlas</span><span class="p">)</span>
+</code></pre>
+</div>
 
-<span class="c1"># Load your data</span>
+<p><img src="images/atlas.png" width="400"></p>
+
+<ol start="2">
+<li>View dataset metadata</li>
+</ol>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="n">ssm</span><span class="o">.</span><span class="n">list_variables</span><span class="p">(</span><span class="s2">&quot;atlas/B.land.cover.2001-2023.a.nc&quot;</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="images/info.png" width="400"></p>
+
+<ol start="3">
+<li>Visualize data on the map</li>
+</ol>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="c1"># Load data</span>
 <span class="n">netcdf_file</span> <span class="o">=</span> <span class="s2">&quot;atlas/T.transportation.roads.nc&quot;</span>
-
-<span class="c1"># Plot with Human-Earth Atlas</span>
-<span class="n">ssm</span><span class="o">.</span><span class="n">plot_map</span><span class="p">(</span><span class="n">variable</span><span class="o">=</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="n">netcdf_file</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;magma_r&#39;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Gross Road Mass&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;g m-2&#39;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mf">1e4</span><span class="p">,</span> <span class="n">extend_max</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">ssm</span><span class="o">.</span><span class="n">plot_map</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">netcdf_file</span><span class="p">,</span><span class="n">variable</span><span class="o">=</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;magma_r&#39;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Gross Road Mass&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;g m-2&#39;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mf">1e4</span><span class="p">,</span> <span class="n">extend_max</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre>
 </div>
 
 <p><img src="images/gross_road.png" alt="Gross Road Mass Map" width="400"/></p>
+
+<ol start="4">
+<li>Quick mathematical operation</li>
+</ol>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="c1"># Load data</span>
+<span class="n">netcdf_file</span> <span class="o">=</span> <span class="s2">&quot;atlas/T.transportation.roads.nc&quot;</span>
+<span class="c1"># Perform the operation</span>
+<span class="n">ssm</span><span class="o">.</span><span class="n">divide_variables</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">netcdf_file</span><span class="p">,</span> <span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;road_length&quot;</span><span class="p">,</span> <span class="n">variable2</span><span class="o">=</span><span class="s2">&quot;grid_area&quot;</span><span class="p">,</span> <span class="n">new_variable_name</span><span class="o">=</span><span class="s2">&quot;road_density&quot;</span><span class="p">)</span>
+</code></pre>
+</div>
 
 <p>Ready to get started? Dive into the function docs below or read <a href="https://www.nature.com/articles/s41597-025-05087-5">The SESAME Human-Earth Atlas</a> paper for inspiration!</p>
 
@@ -145,7 +190,7 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">point_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">points</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;value/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">agg_column</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">attr_field</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
+        <span class="name">point_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">point_data</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;value/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">agg_column</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">attr_field</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -156,7 +201,7 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 <h2 id="parameters">Parameters</h2>
 
 <ul>
-<li>points : GeoDataFrame or str. Input point data to be gridded. Can be either a GeoDataFrame or a path to a point shapefile (.shp).</li>
+<li>point_data : GeoDataFrame or str. Input point data to be gridded. Can be either a GeoDataFrame or a path to a point shapefile (.shp).</li>
 <li>variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
 <ul>
 <li>The unique entries in the <code>attr_field</code> column if specified.</li>
@@ -207,7 +252,7 @@ Defaults to counting the number of points per grid cell.</li>
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">point_2_grid</span><span class="p">(</span><span class="n">points</span><span class="o">=</span><span class="n">shapefile_path</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">point_2_grid</span><span class="p">(</span><span class="n">point_data</span><span class="o">=</span><span class="n">shapefile_path</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">variable_name</span><span class="o">=</span><span class="s2">&quot;airplanes&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">long_name</span><span class="o">=</span><span class="s2">&quot;Airplanes Count&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">units</span><span class="o">=</span><span class="s2">&quot;airport/grid-cell&quot;</span><span class="p">,</span> 
@@ -225,7 +270,7 @@ Defaults to counting the number of points per grid cell.</li>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">line_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">lines</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;meter/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">agg_column</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">attr_field</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
+        <span class="name">line_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">line_data</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;meter/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">agg_column</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">attr_field</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -236,7 +281,7 @@ Defaults to counting the number of points per grid cell.</li>
 <h2 id="parameters">Parameters</h2>
 
 <ul>
-<li>lines : GeoDataFrame or str. Input lines data to be gridded. Can be either a GeoDataFrame or a path to a line/polyline shapefile (.shp).</li>
+<li>line_data : GeoDataFrame or str. Input lines data to be gridded. Can be either a GeoDataFrame or a path to a line/polyline shapefile (.shp).</li>
 <li>variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
 <ul>
 <li>The unique entries in the <code>attr_field</code> column if specified.</li>
@@ -289,7 +334,7 @@ If True, treats zero values as valid data rather than as no-data. Default is Fal
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">line_2_grid</span><span class="p">(</span><span class="n">lines</span><span class="o">=</span><span class="n">shapefile_path</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">line_2_grid</span><span class="p">(</span><span class="n">line_data</span><span class="o">=</span><span class="n">shapefile_path</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">variable_name</span><span class="o">=</span><span class="s2">&quot;roads&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">long_name</span><span class="o">=</span><span class="s2">&quot;Roads Length&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">units</span><span class="o">=</span><span class="s2">&quot;meter/grid-cell&quot;</span><span class="p">,</span> 
@@ -308,7 +353,7 @@ If True, treats zero values as valid data rather than as no-data. Default is Fal
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">poly_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">polygons</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;m2/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">attr_field</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">fraction</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
+        <span class="name">poly_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">polygon_data</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;m2/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">attr_field</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">fraction</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -319,7 +364,7 @@ If True, treats zero values as valid data rather than as no-data. Default is Fal
 <h2 id="parameters">Parameters</h2>
 
 <ul>
-<li>polygons : GeoDataFrame or str. Input polygons data to be gridded. Can be either a GeoDataFrame or a path to a polygons shapefile (.shp).</li>
+<li>polygon_data : GeoDataFrame or str. Input polygons data to be gridded. Can be either a GeoDataFrame or a path to a polygons shapefile (.shp).</li>
 <li>variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
 <ul>
 <li>The unique entries in the <code>attr_field</code> column if specified.</li>
@@ -370,7 +415,7 @@ value provided. Default is None (spatial, 2D netCDF output).</li>
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">poly_2_grid</span><span class="p">(</span><span class="n">polygons</span><span class="o">=</span><span class="n">shapefile_path</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">poly_2_grid</span><span class="p">(</span><span class="n">polygon_data</span><span class="o">=</span><span class="n">shapefile_path</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">units</span><span class="o">=</span><span class="s2">&quot;fraction&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">source</span><span class="o">=</span><span class="s2">&quot;The new global lithological map database GLiM&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">resolution</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> 
@@ -388,7 +433,7 @@ value provided. Default is None (spatial, 2D netCDF output).</li>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">grid_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">raster_path</span>,</span><span class="param">	<span class="n">agg_function</span>,</span><span class="param">	<span class="n">variable_name</span>,</span><span class="param">	<span class="n">long_name</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;value/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">netcdf_variable</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">padding</span><span class="o">=</span><span class="s1">&#39;symmetric&#39;</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
+        <span class="name">grid_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">raster_data</span>,</span><span class="param">	<span class="n">agg_function</span>,</span><span class="param">	<span class="n">variable_name</span>,</span><span class="param">	<span class="n">long_name</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;value/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">netcdf_variable</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">padding</span><span class="o">=</span><span class="s1">&#39;symmetric&#39;</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -399,7 +444,10 @@ value provided. Default is None (spatial, 2D netCDF output).</li>
 <h2 id="parameters">Parameters</h2>
 
 <ul>
-<li>raster_path : str. Path to the input raster data file. This can be either a TIFF or netCDF file.</li>
+<li>raster_data : str. Path to the input raster data file. This can be a string path to a TIFF (.tif) file, a string path to a NetCDF (.nc or .nc4) file or An already loaded xarray.Dataset object.
+<ul>
+<li>If <code>raster_data</code> is a NetCDF file or an xarray.Dataset, the <code>netcdf_variable</code> parameter must also be provided to specify which variable to extract.</li>
+</ul></li>
 <li>agg_function : str. Aggregation method to apply when re-gridding. Supported values are 'SUM', 'MEAN', or 'MAX'.</li>
 <li>variable_name : str. Name of the variable to include in the output dataset.</li>
 <li>long_name : str. Descriptive name for the variable.</li>
@@ -455,7 +503,7 @@ long name, units, and optional source and time information.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">table_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">surrogate_file</span>,</span><span class="param">	<span class="n">surrogate_variable</span>,</span><span class="param">	<span class="n">tabular_file</span>,</span><span class="param">	<span class="n">tabular_column</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;value/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">eez</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
+        <span class="name">table_2_grid</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">surrogate_data</span>,</span><span class="param">	<span class="n">surrogate_variable</span>,</span><span class="param">	<span class="n">tabular_data</span>,</span><span class="param">	<span class="n">tabular_column</span>,</span><span class="param">	<span class="n">variable_name</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">long_name</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">units</span><span class="o">=</span><span class="s1">&#39;value/grid-cell&#39;</span>,</span><span class="param">	<span class="n">source</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_directory</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">zero_is_value</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">normalize_by_area</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">eez</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -466,10 +514,10 @@ long name, units, and optional source and time information.</p>
 <h2 id="parameters">Parameters:</h2>
 
 <ul>
-<li>surrogate_file : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded 
+<li>surrogate_data : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded 
 into an xarray.Dataset. The dataset must include the variable specified in <code>surrogate_variable</code>.</li>
 <li>surrogate_variable : str. Variable name in the NetCDF or xarray dataset used for spatial distribution.</li>
-<li>tabular_file : pandas.DataFrame or str. Tabular dataset as a pandas DataFrame or a path to a CSV file. If a file path is provided, it will be 
+<li>tabular_data : pandas.DataFrame or str. Tabular dataset as a pandas DataFrame or a path to a CSV file. If a file path is provided, it will be 
 automatically loaded into a DataFrame. The data must include a column named "ISO3" representing country codes. 
 If not present, use the <code><a href="#add_iso3_column">add_iso3_column</a></code> utility function to convert country names to ISO3 codes.     </li>
 <li>tabular_column : str. Column name in the tabular dataset with values to be spatially distributed.</li>
@@ -500,9 +548,9 @@ If not present, use the <code><a href="#add_iso3_column">add_iso3_column</a></co
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">table_2_grid</span><span class="p">(</span><span class="n">surrogate_file</span><span class="o">=</span><span class="n">netcdf_file_path</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">table_2_grid</span><span class="p">(</span><span class="n">surrogate_data</span><span class="o">=</span><span class="n">netcdf_file_path</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">surrogate_variable</span><span class="o">=</span><span class="s2">&quot;railway_length&quot;</span><span class="p">,</span> 
-<span class="gp">... </span>            <span class="n">tabular_file</span><span class="o">=</span><span class="n">csv_file_path</span><span class="p">,</span> 
+<span class="gp">... </span>            <span class="n">tabular_data</span><span class="o">=</span><span class="n">csv_file_path</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">tabular_column</span><span class="o">=</span><span class="s2">&quot;steel&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">variable_name</span><span class="o">=</span><span class="s2">&quot;railtract_steel&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">long_name</span><span class="o">=</span><span class="s2">&quot;&#39;Railtrack Steel Mass&#39;&quot;</span><span class="p">,</span> 
@@ -521,7 +569,7 @@ If not present, use the <code><a href="#add_iso3_column">add_iso3_column</a></co
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">grid_2_table</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">grid_file</span>,</span><span class="param">	<span class="n">variables</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">grid_area</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">aggregation</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
+        <span class="name">grid_2_table</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">grid_data</span>,</span><span class="param">	<span class="n">variables</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">grid_area</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">resolution</span><span class="o">=</span><span class="mi">1</span>,</span><span class="param">	<span class="n">aggregation</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">agg_function</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span>,</span><span class="param">	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -532,7 +580,7 @@ If not present, use the <code><a href="#add_iso3_column">add_iso3_column</a></co
 <h2 id="parameters">Parameters:</h2>
 
 <ul>
-<li>grid_file : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
+<li>grid_data : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
 <li>variables : str, optional. Variables name to be processed. It can either be one variable or list of variables. If None, all variables in the dataset (excluding predefined ones) will be considered.</li>
 <li>time : str, optional. Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.</li>
 <li>resolution : float, optional. Resolution of gridded data in degree. Default is 1 degree.</li>
@@ -651,7 +699,7 @@ Optionally remove outliers and apply log transformations.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">plot_scatter</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">variable1</span>,</span><span class="param">	<span class="n">variable2</span>,</span><span class="param">	<span class="n">dataset</span>,</span><span class="param">	<span class="n">dataset2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span>,</span><span class="param">	<span class="n">x_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">y_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">plot_title</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">remove_outliers</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">log_transform_1</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">log_transform_2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">equation</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
+        <span class="name">plot_scatter</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">dataset</span>,</span><span class="param">	<span class="n">variable1</span>,</span><span class="param">	<span class="n">variable2</span>,</span><span class="param">	<span class="n">dataset2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span>,</span><span class="param">	<span class="n">x_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">y_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">plot_title</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">remove_outliers</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">log_transform_1</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">log_transform_2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">equation</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -689,9 +737,9 @@ Optionally remove outliers and apply log transformations.</p>
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_scatter</span><span class="p">(</span><span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_scatter</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds_road</span><span class="p">,</span> 
+<span class="gp">... </span>            <span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">variable2</span><span class="o">=</span><span class="s2">&quot;buildings_gross&quot;</span><span class="p">,</span> 
-<span class="gp">... </span>            <span class="n">dataset</span><span class="o">=</span><span class="n">ds_road</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">dataset2</span><span class="o">=</span><span class="n">ds_build</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span>
 <span class="gp">... </span>            <span class="n">plot_title</span><span class="o">=</span><span class="s2">&quot;Building vs Road&quot;</span><span class="p">,</span> 
@@ -762,7 +810,7 @@ Optionally remove outliers and apply log transformations.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">plot_hexbin</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">variable1</span>,</span><span class="param">	<span class="n">variable2</span>,</span><span class="param">	<span class="n">dataset</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">dataset2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;pink_r&#39;</span>,</span><span class="param">	<span class="n">grid_size</span><span class="o">=</span><span class="mi">30</span>,</span><span class="param">	<span class="n">x_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">y_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">plot_title</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">remove_outliers</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">log_transform_1</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">log_transform_2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
+        <span class="name">plot_hexbin</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">dataset</span>,</span><span class="param">	<span class="n">variable1</span>,</span><span class="param">	<span class="n">variable2</span>,</span><span class="param">	<span class="n">dataset2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;pink_r&#39;</span>,</span><span class="param">	<span class="n">grid_size</span><span class="o">=</span><span class="mi">30</span>,</span><span class="param">	<span class="n">x_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">y_label</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">plot_title</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">remove_outliers</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">log_transform_1</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">log_transform_2</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -773,9 +821,9 @@ Optionally remove outliers and apply log transformations.</p>
 <p>Parameters:</p>
 
 <ul>
+<li>dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by <code>variable1</code>, which will be used for the x-axis.</li>
 <li>variable1 : str, name of the variable to be plotted on the x-axis. Must be present in <code>dataset</code>.</li>
 <li>variable2 : str, name of the variable to be plotted on the y-axis. If <code>dataset2</code> is provided, this variable will be extracted from <code>dataset2</code>; otherwise, it must exist in <code>dataset</code>.</li>
-<li>dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by <code>variable1</code>, which will be used for the x-axis.</li>
 <li>dataset2 : xarray.Dataset or str, optional, a second dataset or a path to a NetCDF file containing the variable specified by <code>variable2</code> (for the y-axis). If not provided, <code>dataset</code> will be used for both variables.</li>
 <li>time: str, optional, the time slice to plot.</li>
 <li>color: str, optional, the color map of the hexbin plot.</li>
@@ -799,9 +847,9 @@ Optionally remove outliers and apply log transformations.</p>
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_hexbin</span><span class="p">(</span><span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_hexbin</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds_road</span><span class="p">,</span> 
+<span class="gp">... </span>            <span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">variable2</span><span class="o">=</span><span class="s2">&quot;buildings_gross&quot;</span><span class="p">,</span> 
-<span class="gp">... </span>            <span class="n">dataset</span><span class="o">=</span><span class="n">ds_road</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">dataset2</span><span class="o">=</span><span class="n">ds_build</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">plot_title</span><span class="o">=</span><span class="s2">&quot;Building vs Road&quot;</span>
@@ -816,7 +864,7 @@ Optionally remove outliers and apply log transformations.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">plot_map</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">variable</span>,</span><span class="param">	<span class="n">dataset</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;hot_r&#39;</span>,</span><span class="param">	<span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">label</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">vmin</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">vmax</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">extend_min</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">extend_max</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">levels</span><span class="o">=</span><span class="mi">10</span>,</span><span class="param">	<span class="n">out_bound</span><span class="o">=</span><span class="kc">True</span>,</span><span class="param">	<span class="n">remove_ata</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">show</span><span class="o">=</span><span class="kc">True</span></span><span class="return-annotation">):</span></span>
+        <span class="name">plot_map</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">dataset</span>,</span><span class="param">	<span class="n">variable</span>,</span><span class="param">	<span class="n">time</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;hot_r&#39;</span>,</span><span class="param">	<span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">label</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">vmin</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">vmax</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">extend_min</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">extend_max</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">levels</span><span class="o">=</span><span class="mi">10</span>,</span><span class="param">	<span class="n">out_bound</span><span class="o">=</span><span class="kc">True</span>,</span><span class="param">	<span class="n">remove_ata</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">show</span><span class="o">=</span><span class="kc">True</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -827,8 +875,8 @@ Optionally remove outliers and apply log transformations.</p>
 <h2 id="parameters">Parameters</h2>
 
 <ul>
-<li>variable : str. Name of the variable in the xarray Dataset to plot.</li>
 <li>dataset : xarray.Dataset. or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
+<li>variable : str. Name of the variable in the xarray Dataset to plot.</li>
 <li>color : str, default 'hot_r'. Matplotlib colormap name for the plot (discrete color scale).</li>
 <li>title : str, default ''. Title of the map.</li>
 <li>label : str, default ''. Label for the colorbar.</li>
@@ -867,8 +915,8 @@ Optionally remove outliers and apply log transformations.</p>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_map</span><span class="p">(</span>
-<span class="gp">... </span>    <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;npp&#39;</span><span class="p">,</span>
 <span class="gp">... </span>    <span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">time</span><span class="o">=-</span><span class="mi">1</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;npp&#39;</span><span class="p">,</span>
 <span class="gp">... </span>    <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
 <span class="gp">... </span>    <span class="n">vmax</span><span class="o">=</span><span class="mi">1200</span><span class="p">,</span>
 <span class="gp">... </span>    <span class="n">extend_max</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -889,7 +937,7 @@ Optionally remove outliers and apply log transformations.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">plot_country</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">tabular_file</span>,</span><span class="param">	<span class="n">column</span>,</span><span class="param">	<span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">label</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span>,</span><span class="param">	<span class="n">levels</span><span class="o">=</span><span class="mi">10</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">remove_ata</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">out_bound</span><span class="o">=</span><span class="kc">True</span>,</span><span class="param">	<span class="n">vmin</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">vmax</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">extend_min</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">extend_max</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
+        <span class="name">plot_country</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">tabular_data</span>,</span><span class="param">	<span class="n">column</span>,</span><span class="param">	<span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">label</span><span class="o">=</span><span class="s1">&#39;&#39;</span>,</span><span class="param">	<span class="n">color</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span>,</span><span class="param">	<span class="n">levels</span><span class="o">=</span><span class="mi">10</span>,</span><span class="param">	<span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">filename</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">remove_ata</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">out_bound</span><span class="o">=</span><span class="kc">True</span>,</span><span class="param">	<span class="n">vmin</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">vmax</span><span class="o">=</span><span class="kc">None</span>,</span><span class="param">	<span class="n">extend_min</span><span class="o">=</span><span class="kc">False</span>,</span><span class="param">	<span class="n">extend_max</span><span class="o">=</span><span class="kc">False</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -900,7 +948,7 @@ Optionally remove outliers and apply log transformations.</p>
 <h2 id="parameters">Parameters:</h2>
 
 <ul>
-<li>tabular_file : pandas.DataFrame or str. Input table containing country-level data. Can be either:
+<li>tabular_data : pandas.DataFrame or str. Input table containing country-level data. Can be either:
 <ul>
 <li>A pandas DataFrame with the required <code>column</code></li>
 <li>A string path to a CSV file, which will be automatically read into a DataFrame</li>
@@ -929,7 +977,7 @@ Optionally remove outliers and apply log transformations.</p>
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_country</span><span class="p">(</span><span class="n">tabular_file</span><span class="o">=</span><span class="s2">&quot;country_data.csv&quot;</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_country</span><span class="p">(</span><span class="n">tabular_data</span><span class="o">=</span><span class="s2">&quot;country_data.csv&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">column</span><span class="o">=</span><span class="s2">&quot;population&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Population of Countries&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Population&quot;</span><span class="p">,</span> 
@@ -975,7 +1023,7 @@ zeros back to NaNs.</p>
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">sum_variables</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span> 
 <span class="gp">... </span>             <span class="n">variables</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> <span class="s2">&quot;buildings_gross&quot;</span><span class="p">],</span> 
-<span class="gp">... </span>             <span class="n">new_variable_name</span><span class="o">=</span><span class="s2">&quot;total_gross&quot;</span>
+<span class="gp">... </span>             <span class="n">new_variable_name</span><span class="o">=</span><span class="s2">&quot;gross_mass&quot;</span>
 <span class="gp">... </span><span class="p">)</span>
 </code></pre>
 </div>
@@ -987,7 +1035,7 @@ zeros back to NaNs.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">subtract_variables</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">variable1</span>, </span><span class="param"><span class="n">variable2</span>, </span><span class="param"><span class="n">dataset</span>, </span><span class="param"><span class="n">new_variable_name</span><span class="o">=</span><span class="kc">None</span>, </span><span class="param"><span class="n">time</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
+        <span class="name">subtract_variables</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">dataset</span>, </span><span class="param"><span class="n">variable1</span>, </span><span class="param"><span class="n">variable2</span>, </span><span class="param"><span class="n">new_variable_name</span><span class="o">=</span><span class="kc">None</span>, </span><span class="param"><span class="n">time</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -999,9 +1047,9 @@ Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs
 <h2 id="parameters">Parameters:</h2>
 
 <ul>
+<li>dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
 <li>variable1: str, the name of the variable to subtract from.</li>
 <li>variable2: str, the name of the variable to subtract.</li>
-<li>dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
 <li>new_variable_name: str, optional, the name of the new variable to store the result.</li>
 <li>time: optional, a specific time slice to select from the dataset.</li>
 </ul>
@@ -1015,9 +1063,9 @@ Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">subtract_variables</span><span class="p">(</span><span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;precipitation&quot;</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">subtract_variables</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span>
+<span class="gp">... </span>                  <span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;precipitation&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>                  <span class="n">variable2</span><span class="o">=</span><span class="s2">&quot;evaporation&quot;</span><span class="p">,</span> 
-<span class="gp">... </span>                  <span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span> 
 <span class="gp">... </span>                  <span class="n">new_variable_name</span><span class="o">=</span><span class="s2">&quot;net_water_gain&quot;</span>
 <span class="gp">... </span><span class="p">)</span>
 </code></pre>
@@ -1030,7 +1078,7 @@ Fill NaNs with zero before subtracting, and convert resulting zeros back to NaNs
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">divide_variables</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">variable1</span>, </span><span class="param"><span class="n">variable2</span>, </span><span class="param"><span class="n">dataset</span>, </span><span class="param"><span class="n">new_variable_name</span><span class="o">=</span><span class="kc">None</span>, </span><span class="param"><span class="n">time</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
+        <span class="name">divide_variables</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">dataset</span>, </span><span class="param"><span class="n">variable1</span>, </span><span class="param"><span class="n">variable2</span>, </span><span class="param"><span class="n">new_variable_name</span><span class="o">=</span><span class="kc">None</span>, </span><span class="param"><span class="n">time</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -1042,9 +1090,9 @@ Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.</
 <h2 id="parameters">Parameters:</h2>
 
 <ul>
+<li>dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.    </li>
 <li>variable1: str, the name of the variable to be divided (numerator).</li>
 <li>variable2: str, the name of the variable to divide by (denominator).</li>
-<li>dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.</li>
 <li>new_variable_name: str, optional, the name of the new variable to store the result.</li>
 <li>time: optional, a specific time slice to select from the dataset.</li>
 </ul>
@@ -1058,9 +1106,9 @@ Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.</
 <h2 id="example">Example</h2>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">divide_variables</span><span class="p">(</span><span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;roads_gross&quot;</span><span class="p">,</span> 
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">divide_variables</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span>
+<span class="gp">... </span>                 <span class="n">variable1</span><span class="o">=</span><span class="s2">&quot;road_length&quot;</span><span class="p">,</span> 
 <span class="gp">... </span>                 <span class="n">variable2</span><span class="o">=</span><span class="s2">&quot;grid_area&quot;</span><span class="p">,</span> 
-<span class="gp">... </span>                 <span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span> 
 <span class="gp">... </span>                 <span class="n">new_variable_name</span><span class="o">=</span><span class="s2">&quot;road_density&quot;</span>
 <span class="gp">... </span><span class="p">)</span>
 </code></pre>
@@ -1184,6 +1232,70 @@ zeros back to NaNs.</p>
 <pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">get_netcdf_info</span><span class="p">(</span><span class="n">netcdf_file</span><span class="o">=</span><span class="n">netcdf_file_path</span><span class="p">,</span> 
 <span class="gp">... </span>                <span class="n">variable_name</span><span class="o">=</span><span class="s2">&quot;railway_length&quot;</span>
 <span class="gp">... </span><span class="p">)</span>
+</code></pre>
+</div>
+</div>
+
+
+                </section>
+                <section id="atlas">
+                    <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">atlas</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">directory</span></span><span class="return-annotation">):</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#atlas"></a>
+    
+            <div class="docstring"><p>List all NetCDF files in a directory and count the number of variables in each.</p>
+
+<h2 id="parameters">Parameters</h2>
+
+<p>directory : str. Path to the directory containing NetCDF files.</p>
+
+<h2 id="returns">Returns</h2>
+
+<p>pd.DataFrame. A DataFrame with file names and the number of variables in each file.</p>
+
+<h2 id="example">Example</h2>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">atlas</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+</code></pre>
+</div>
+</div>
+
+
+                </section>
+                <section id="info">
+                    <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">info</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">data</span></span><span class="return-annotation">):</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#info"></a>
+    
+            <div class="docstring"><p>Extract metadata for each variable in a NetCDF dataset.</p>
+
+<h2 id="parameters">Parameters</h2>
+
+<ul>
+<li>data : str, os.PathLike, or xarray.Dataset. Path to a NetCDF file or an xarray.Dataset object.</li>
+</ul>
+
+<h2 id="returns">Returns</h2>
+
+<ul>
+<li>pd.DataFrame. A DataFrame containing variable names, long names, units, sources, time range (start and end), time resolution (step), and depth values (if present as a variable).</li>
+</ul>
+
+<h2 id="example">Example</h2>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">info</span><span class="p">(</span><span class="n">netcdf_path</span><span class="p">)</span>
 </code></pre>
 </div>
 </div>

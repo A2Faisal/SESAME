@@ -13,14 +13,13 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 
 **Getting Started with the Human-Earth Atlas:**
 
-1. Install SESAME
+1. Install SESAME*
 2. Download the Human-Earth Atlas ([Figshare Link](https://doi.org/10.6084/m9.figshare.28432499))
 3. Load your spatial data (e.g., land cover, population, climate)
 4. Use SESAME’s plotting tools to visualize and compare datasets
 5. Explore the Human-Earth Atlas by overlaying your data with global reference layers
 
-
-**Note - SESAME may take up to 2 minutes to load when used for the first time. This will not recur with further use.**
+*Note: SESAME may take up to 2 minutes to load when used for the first time. This will not recur with further use.
 
 **Navigating the Atlas:**
 1. List the netCDF files in the“Human–Earth Atlas”
@@ -28,10 +27,14 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 import sesame as ssm
 ssm.atlas(directory=atlas)
 ```
+<img src="images/atlas.png" width="400">
+
 2. View dataset metadata
 ```python
 ssm.list_variables("atlas/B.land.cover.2001-2023.a.nc")
 ```
+<img src="images/info.png" width="400">
+
 3. Visualize data on the map
 ```python
 # Load data
@@ -60,17 +63,17 @@ import numpy as np
 import xarray as xr
 import json
 
-# from . import create
-# from . import utils
-# from . import calculate
-# from . import plot
-# from . import get
+from . import create
+from . import utils
+from . import calculate
+from . import plot
+from . import get
 
-import create
-import utils
-import calculate
-import plot
-import get
+# import create
+# import utils
+# import calculate
+# import plot
+# import get
 
 
 def point_2_grid(point_data, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
