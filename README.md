@@ -2,30 +2,22 @@
 
 ## About
 
-The **SESAME project** aims to unify key human and non-human (Earth system) datasets into a shared spatially-gridded format. These datasets are often siloed in incompatible formats; SESAME bridges that gap to accelerate scientific discovery and interdisciplinary modeling.
+The **SESAME project** aims to unify key human and non-human (Earth system) datasets into a shared spatially-gridded format. These datasets are often siloed in incompatible formats (eg. csv, tiff, netcdf, shp, etc.); SESAME improves interdisciplinary data discoverability and interoperability for research and modeling the global human system.
 
 ---
 
 ## 📑 Table of Contents
 
-- [Goals](#goals)
-- [Example Tools](#example-tools)
+- [Main Tools](#example-tools)
+- [Installation Instructions](#installation-instructions)
+- [Dependencies](#dependencies)
 - [Human-Earth Atlas](#human-earth-atlas)
 - [Software Documentation](#software-documentation)
-- [Installation Instructions](#installation-instructions)
 - [Contact](#contact)
 
 ---
 
-## Goals
-
-- Unify human and non-human system datasets in a standardized spatially-gridded structure.
-- Improve data discoverability and interoperability for research and modeling.
-- Support interdisciplinary science through accessible, integrated datasets.
-
----
-
-## Example Tools
+## Main Tools
 
 - **`point_2_grid`**  
   Maps point data onto standardized global grids. Supports counting points per cell, summing or averaging associated values, or grouping by class to generate multi-variable datasets.
@@ -53,6 +45,59 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ---
 
+## Installation Instructions
+
+If you're using **conda** to manage your Python environment:
+
+### Step 1: Create and activate the environment
+
+```bash
+# create a new conda environment
+conda create -n sesame_env
+# activate the environment
+conda activate sesame_env
+# install pip
+conda install pip
+# install SESAME from testPyPI
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.1
+```
+### Step 2: Add this as a Python code snippet:
+```bash
+import sesame as ssm 
+```
+
+### If you are using Windows and encounter the error: 
+"ERROR: Failed building wheel for cartopy," please follow these steps:
+
+1. Download and install the Microsoft C++ Build Tools from the official website:  
+   [https://visualstudio.microsoft.com/visual-cpp-build-tools/](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+
+2. During installation, make sure to select the **"Desktop development with C++"** workload.  
+   This is required to build packages like cartopy that depend on C++ extensions.
+
+![Visual Studio Build Tools Installation](https://github.com/A2Faisal/SESAME/blob/main/docs/images/vs_build_tools.png)
+
+---
+
+## Dependencies
+
+- geopandas>=1.0.1
+- xarray>=2024.6.0
+- h5netcdf>=1.3.0
+- rasterio>=1.3.10
+- matplotlib>=3.9.1
+- seaborn>=0.13.2
+- scipy>=1.14.0
+- cartopy==0.23.0
+
+---
+
+## License
+
+[MIT License](https://github.com/A2Faisal/SESAME/blob/main/LICENSE)
+
+--- 
+
 ## Human-Earth Atlas
 
 **Data Access**:
@@ -72,38 +117,6 @@ Detailed setup, usage instructions, advanced features, and testing procedures ar
 📄 [**SESAME Software Manual (v1.1)**](https://a2faisal.github.io/SESAME/)
 
 ---
-
-## Installation Instructions
-
-If you're using **conda** to manage your Python environment:
-
-### Step 1: Create and activate the environment
-
-```bash
-# create a new conda environment
-conda create -n sesame_env
-# activate the environment
-conda activate sesame_env
-# install pip
-conda install pip
-# install SESAME from testPyPI
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.0
-```
-### Step 2: Add this as a Python code snippet:
-```bash
-import sesame as ssm 
-```
-
-### If you are using Windows and encounter the error: 
-"ERROR: Failed building wheel for cartopy," please follow these steps:
-
-1. Download and install the Microsoft C++ Build Tools from the official website:  
-   [https://visualstudio.microsoft.com/visual-cpp-build-tools/](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-
-2. During installation, make sure to select the **"Desktop development with C++"** workload.  
-   This is required to build packages like cartopy that depend on C++ extensions.
-
-![Visual Studio Build Tools Installation](https://github.com/A2Faisal/SESAME/blob/main/docs/images/vs_build_tools.png)
 
 
 ## Contact
