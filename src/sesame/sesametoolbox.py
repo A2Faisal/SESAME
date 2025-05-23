@@ -22,18 +22,18 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 *Note: SESAME may take up to 2 minutes to load when used for the first time. This will not recur with further use.
 
 **Navigating the Atlas:**
-1. List the netCDF files in the“Human–Earth Atlas”
+1. List the netCDF files in the Human–Earth Atlas
 ```python
 import sesame as ssm
 ssm.atlas(directory=atlas)
 ```
-<img src="images/atlas.png" width=400">
+<img src="../images/atlas.png" alt="Human-Earth Atlas" width="600"/>
 
 2. View dataset metadata
 ```python
 ssm.list_variables("atlas/B.land.cover.2001-2023.a.nc")
 ```
-<img src="images/info.png" width="400">
+<img src="../images/info.png" alt="NetCDF Info" width="600"/>
 
 3. Visualize data on the map
 ```python
@@ -41,7 +41,7 @@ ssm.list_variables("atlas/B.land.cover.2001-2023.a.nc")
 netcdf_file = "atlas/T.transportation.roads.nc"
 ssm.plot_map(dataset=netcdf_file,variable="roads_gross", color='magma_r', title='Gross Road Mass', label='g m-2', vmin=0, vmax=1e4, extend_max=True)
 ```
-<img src="images/gross_road.png" alt="Gross Road Mass Map" width="400"/>
+<img src="../images/gross_road.png" alt="Gross Road Mass Map" width="600"/>
 
 4. Quick mathematical operation
 ```python
