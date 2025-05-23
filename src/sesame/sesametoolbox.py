@@ -27,7 +27,7 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 import sesame as ssm
 ssm.atlas(directory=atlas)
 ```
-<img src="images/atlas.png" width="400">
+<img src="images/atlas.png" width=400">
 
 2. View dataset metadata
 ```python
