@@ -6,10 +6,10 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 
 **What can you do with the SESAME toolbox?**
 
-- Conveniently process, analyze, and visualize spatial datasets (e.g., shapefiles, GeoTIFFs, CSVs with coordinates or country names).
-- Perform spatial operations such as overlay, intersection, and variable extraction.
+- Conveniently process and analyze both spatial datasets (e.g. GeoTIFFs) and tabular jurisdictional data (e.g. csv files by country) through a unified set of tools.
+- Generate standardized netcdf files from a wide range of spatial input types (e.g. lines, points, polygons)
 - Create publication-ready maps and plots.
-- Integrate with the Human-Earth Atlas to explore global patterns in Human-Earth systems.
+- Explore spatial and temporal patterns among hundreds of variables in the Human-Earth Atlas.
 
 **Getting Started with the Human-Earth Atlas:**
 
@@ -19,17 +19,34 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 4. Use SESAME’s plotting tools to visualize and compare datasets
 5. Explore the Human-Earth Atlas by overlaying your data with global reference layers
 
+
+**Note - SESAME may take up to 2 minutes to load when used for the first time. This will not recur with further use.**
+
+**Navigating the Atlas:**
+1. List the netCDF files in the“Human–Earth Atlas”
 ```python
 import sesame as ssm
-
-# Load your data
-netcdf_file = "atlas/T.transportation.roads.nc"
-
-# Plot with Human-Earth Atlas
-ssm.plot_map(variable="roads_gross", dataset=netcdf_file, color='magma_r', title='Gross Road Mass', label='g m-2', vmin=0, vmax=1e4, extend_max=True)
+ssm.atlas(directory=atlas)
 ```
-
+2. View dataset metadata
+```python
+ssm.list_variables("atlas/B.land.cover.2001-2023.a.nc")
+```
+3. Visualize data on the map
+```python
+# Load data
+netcdf_file = "atlas/T.transportation.roads.nc"
+ssm.plot_map(dataset=netcdf_file,variable="roads_gross", color='magma_r', title='Gross Road Mass', label='g m-2', vmin=0, vmax=1e4, extend_max=True)
+```
 <img src="images/gross_road.png" alt="Gross Road Mass Map" width="400"/>
+
+4. Quick mathematical operation
+```python
+# Load data
+netcdf_file = "atlas/T.transportation.roads.nc"
+# Perform the operation
+ssm.divide_variables(dataset=netcdf_file, variable1="road_length", variable2="grid_area", new_variable_name="road_density")
+```
 
 Ready to get started? Dive into the function docs below or read [The SESAME Human-Earth Atlas](https://www.nature.com/articles/s41597-025-05087-5) paper for inspiration!
 
@@ -43,21 +60,27 @@ import numpy as np
 import xarray as xr
 import json
 
-from . import create
-from . import utils
-from . import calculate
-from . import plot
-from . import get
+# from . import create
+# from . import utils
+# from . import calculate
+# from . import plot
+# from . import get
+
+import create
+import utils
+import calculate
+import plot
+import get
 
 
-def point_2_grid(points, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+def point_2_grid(point_data, variable_name='variable', long_name='variable', units="value/grid-cell", source=None, time=None, resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
     
     """
     Converts point data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
 
     Parameters
     ----------
-    - points : GeoDataFrame or str. Input point data to be gridded. Can be either a GeoDataFrame or a path to a point shapefile (.shp).
+    - point_data : GeoDataFrame or str. Input point data to be gridded. Can be either a GeoDataFrame or a path to a point shapefile (.shp).
     - variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
         - The unique entries in the `attr_field` column if specified.
         - The input filename without extension if `attr_field` and `variable_name` are not specified.
@@ -96,7 +119,7 @@ def point_2_grid(points, variable_name='variable', long_name='variable', units="
     
     Example
     -------
-    >>> point_2_grid(points=shapefile_path, 
+    >>> point_2_grid(point_data=shapefile_path, 
     ...             variable_name="airplanes", 
     ...             long_name="Airplanes Count", 
     ...             units="airport/grid-cell", 
@@ -108,12 +131,12 @@ def point_2_grid(points, variable_name='variable', long_name='variable', units="
     """
 
     # Determine if input is a path (string or Path) or a GeoDataFrame
-    if isinstance(points, (str, bytes, os.PathLike)):
+    if isinstance(point_data, (str, bytes, os.PathLike)):
         if verbose:
             print("Reading shapefile from path...")
-        points_gdf = gpd.read_file(points)
-    elif isinstance(points, gpd.GeoDataFrame):
-        points_gdf = points
+        points_gdf = gpd.read_file(point_data)
+    elif isinstance(point_data, gpd.GeoDataFrame):
+        points_gdf = point_data
     else:
         raise TypeError("Input must be a GeoDataFrame or a shapefile path (string or Path).")
 
@@ -193,21 +216,21 @@ def point_2_grid(points, variable_name='variable', long_name='variable', units="
         # Set output directory
         output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
         # Set base filename
-        base_filename = os.path.splitext(os.path.basename(points))[0] if isinstance(points, (str, bytes, os.PathLike)) else "gridded_points"
+        base_filename = os.path.splitext(os.path.basename(point_data))[0] if isinstance(point_data, (str, bytes, os.PathLike)) else "gridded_points"
         # Set output filename
         output_filename = output_filename or base_filename
         # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
     return ds
 
-def line_2_grid(lines, variable_name='variable', long_name='variable', units="meter/grid-cell", source=None, time=None, resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+def line_2_grid(line_data, variable_name='variable', long_name='variable', units="meter/grid-cell", source=None, time=None, resolution=1, agg_column=None, agg_function="sum", attr_field=None, output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
     
     """
     Converts line data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
 
     Parameters
     ----------
-    - lines : GeoDataFrame or str. Input lines data to be gridded. Can be either a GeoDataFrame or a path to a line/polyline shapefile (.shp).
+    - line_data : GeoDataFrame or str. Input lines data to be gridded. Can be either a GeoDataFrame or a path to a line/polyline shapefile (.shp).
     - variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
         - The unique entries in the `attr_field` column if specified.
         - The input filename without extension if `attr_field` and `variable_name` are not specified.
@@ -248,7 +271,7 @@ def line_2_grid(lines, variable_name='variable', long_name='variable', units="me
     
     Example
     -------
-    >>> line_2_grid(lines=shapefile_path, 
+    >>> line_2_grid(line_data=shapefile_path, 
     ...             variable_name="roads", 
     ...             long_name="Roads Length", 
     ...             units="meter/grid-cell", 
@@ -261,12 +284,12 @@ def line_2_grid(lines, variable_name='variable', long_name='variable', units="me
     """
 
     # Determine if input is a path (string or Path) or a GeoDataFrame
-    if isinstance(lines, (str, bytes, os.PathLike)):
+    if isinstance(line_data, (str, bytes, os.PathLike)):
         if verbose:
             print("Reading shapefile from path...")
-        lines_gdf = gpd.read_file(lines)
-    elif isinstance(lines, gpd.GeoDataFrame):
-        lines_gdf = lines
+        lines_gdf = gpd.read_file(line_data)
+    elif isinstance(line_data, gpd.GeoDataFrame):
+        lines_gdf = line_data
     else:
         raise TypeError("Input must be a GeoDataFrame or a shapefile path (string or Path).")
 
@@ -351,21 +374,21 @@ def line_2_grid(lines, variable_name='variable', long_name='variable', units="me
         # Set output directory
         output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
         # Set base filename
-        base_filename = os.path.splitext(os.path.basename(lines))[0] if isinstance(lines, (str, bytes, os.PathLike)) else "gridded_lines"
+        base_filename = os.path.splitext(os.path.basename(line_data))[0] if isinstance(line_data, (str, bytes, os.PathLike)) else "gridded_lines"
         # Set output filename
         output_filename = output_filename or base_filename
         # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
     return ds
 
-def poly_2_grid(polygons, variable_name='variable', long_name='variable', units="m2/grid-cell", source=None, time=None, resolution=1, attr_field=None, fraction=False, agg_function="sum", output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
+def poly_2_grid(polygon_data, variable_name='variable', long_name='variable', units="m2/grid-cell", source=None, time=None, resolution=1, attr_field=None, fraction=False, agg_function="sum", output_directory=None, output_filename=None, normalize_by_area=False, zero_is_value=False, verbose=False):
 
     """
     Converts polygon data from a shapefile or GeoDataFrame into a gridded netCDF dataset.
 
     Parameters
     ----------
-    - polygons : GeoDataFrame or str. Input polygons data to be gridded. Can be either a GeoDataFrame or a path to a polygons shapefile (.shp).
+    - polygon_data : GeoDataFrame or str. Input polygons data to be gridded. Can be either a GeoDataFrame or a path to a polygons shapefile (.shp).
     - variable_name : str, optional. Name of the variable to include in the netCDF attributes metadata. Defaults to:
         - The unique entries in the `attr_field` column if specified.
         - The input filename without extension if `attr_field` and `variable_name` are not specified.
@@ -404,7 +427,7 @@ def poly_2_grid(polygons, variable_name='variable', long_name='variable', units=
 
     Example
     -------
-    >>> poly_2_grid(polygons=shapefile_path, 
+    >>> poly_2_grid(polygon_data=shapefile_path, 
     ...             units="fraction", 
     ...             source="The new global lithological map database GLiM", 
     ...             resolution=1, 
@@ -416,12 +439,12 @@ def poly_2_grid(polygons, variable_name='variable', long_name='variable', units=
     """
 
     # Determine if input is a path (string or Path) or a GeoDataFrame
-    if isinstance(polygons, (str, bytes, os.PathLike)):
+    if isinstance(polygon_data, (str, bytes, os.PathLike)):
         if verbose:
             print("Reading shapefile from path...")
-        poly_gdf = gpd.read_file(polygons)
-    elif isinstance(polygons, gpd.GeoDataFrame):
-        poly_gdf = polygons
+        poly_gdf = gpd.read_file(polygon_data)
+    elif isinstance(polygon_data, gpd.GeoDataFrame):
+        poly_gdf = polygon_data
     else:
         raise TypeError("Input must be a GeoDataFrame or a shapefile path (string or Path).")
 
@@ -508,21 +531,22 @@ def poly_2_grid(polygons, variable_name='variable', long_name='variable', units=
         # Set output directory
         output_directory = (output_directory or os.getcwd()).rstrip(os.sep) + os.sep
         # Set base filename
-        base_filename = os.path.splitext(os.path.basename(polygons))[0] if isinstance(polygons, (str, bytes, os.PathLike)) else "gridded_polygons"
+        base_filename = os.path.splitext(os.path.basename(polygon_data))[0] if isinstance(polygon_data, (str, bytes, os.PathLike)) else "gridded_polygons"
         # Set output filename
         output_filename = output_filename or base_filename
         # save the xarray dataset
         utils.save_to_nc(ds, output_directory=output_directory, output_filename=output_filename, base_filename=base_filename)
     return ds  
 
-def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, resolution=1, netcdf_variable=None, output_directory=None, output_filename=None, padding="symmetric", zero_is_value=False, normalize_by_area=False, verbose=False):  
+def grid_2_grid(raster_data, agg_function, variable_name, long_name, units="value/grid-cell", source=None, time=None, resolution=1, netcdf_variable=None, output_directory=None, output_filename=None, padding="symmetric", zero_is_value=False, normalize_by_area=False, verbose=False):  
 
     """
     Converts raster data (TIFF or netCDF) into a re-gridded xarray dataset.
 
     Parameters
     ----------
-    - raster_path : str. Path to the input raster data file. This can be either a TIFF or netCDF file.
+    - raster_data : str. Path to the input raster data file. This can be a string path to a TIFF (.tif) file, a string path to a NetCDF (.nc or .nc4) file or An already loaded xarray.Dataset object.
+        - If `raster_data` is a NetCDF file or an xarray.Dataset, the `netcdf_variable` parameter must also be provided to specify which variable to extract.
     - agg_function : str. Aggregation method to apply when re-gridding. Supported values are 'SUM', 'MEAN', or 'MAX'.
     - variable_name : str. Name of the variable to include in the output dataset.
     - long_name : str. Descriptive name for the variable.
@@ -565,13 +589,16 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
     """
 
     # Determine the file extension
-    file_extension = os.path.splitext(raster_path)[1]
+    if isinstance(raster_data, (str, bytes, os.PathLike)):
+        file_extension = os.path.splitext(raster_data)[1].lower()
+    elif isinstance(raster_data, xr.Dataset):
+        file_extension = ".nc"
 
     if file_extension == ".tif":
         if verbose:
             print("Reading the tif file.")
         # Convert TIFF data to a re-gridded dataset
-        ds = utils.tif_2_ds(input_raster=raster_path, agg_function=agg_function, variable_name=variable_name, 
+        ds = utils.tif_2_ds(input_raster=raster_data, agg_function=agg_function, variable_name=variable_name, 
                       long_name=long_name, units=units, source=source, resolution=resolution, time=time, padding=padding,
                       zero_is_value=zero_is_value, normalize_by_area=normalize_by_area, verbose=verbose)
     
@@ -579,11 +606,13 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
         if verbose:
             print("Reading the nc file.")
         # Convert netCDF to TIFF
-        netcdf_tif_path = utils.netcdf_2_tif(netcdf_path=raster_path, netcdf_variable=netcdf_variable, time=time)
+        netcdf_tif_path, temp_path = utils.netcdf_2_tif(raster_data=raster_data, netcdf_variable=netcdf_variable, time=time)
         # Convert netCDF data to a re-gridded dataset
         ds = utils.tif_2_ds(input_raster=netcdf_tif_path, agg_function=agg_function, variable_name=variable_name, 
                       long_name=long_name, units=units, source=source, resolution=resolution, time=time, padding=padding,
                       zero_is_value=zero_is_value, normalize_by_area=normalize_by_area, verbose=verbose)
+        # delete temp folder
+        utils.delete_temporary_folder(temp_path)
     else:
         # Print an error message for unrecognized file types
         print("Error: File type is not recognized. File type should be either TIFF or netCDF file.")
@@ -602,16 +631,16 @@ def grid_2_grid(raster_path, agg_function, variable_name, long_name, units="valu
         print("Re-gridding completed!")
     return ds
 
-def table_2_grid(surrogate_file, surrogate_variable, tabular_file, tabular_column, variable_name=None, long_name=None, units="value/grid-cell", source=None, time=None, output_directory=None, output_filename=None, zero_is_value=False, normalize_by_area=False, eez=False, verbose=False):
+def table_2_grid(surrogate_data, surrogate_variable, tabular_data, tabular_column, variable_name=None, long_name=None, units="value/grid-cell", source=None, time=None, output_directory=None, output_filename=None, zero_is_value=False, normalize_by_area=False, eez=False, verbose=False):
     """
     Convert tabular data to a gridded dataset by spatially distributing values based on a NetCDF variable and a tabular column.
 
     Parameters:
     -----------
-    - surrogate_file : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded 
+    - surrogate_data : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded 
         into an xarray.Dataset. The dataset must include the variable specified in `surrogate_variable`.
     - surrogate_variable : str. Variable name in the NetCDF or xarray dataset used for spatial distribution.
-    - tabular_file : pandas.DataFrame or str. Tabular dataset as a pandas DataFrame or a path to a CSV file. If a file path is provided, it will be 
+    - tabular_data : pandas.DataFrame or str. Tabular dataset as a pandas DataFrame or a path to a CSV file. If a file path is provided, it will be 
         automatically loaded into a DataFrame. The data must include a column named "ISO3" representing country codes. 
         If not present, use the `add_iso3_column` utility function to convert country names to ISO3 codes.     
     - tabular_column : str. Column name in the tabular dataset with values to be spatially distributed.
@@ -636,9 +665,9 @@ def table_2_grid(surrogate_file, surrogate_variable, tabular_file, tabular_colum
 
     Example
     -------
-    >>> table_2_grid(surrogate_file=netcdf_file_path, 
+    >>> table_2_grid(surrogate_data=netcdf_file_path, 
     ...             surrogate_variable="railway_length", 
-    ...             tabular_file=csv_file_path, 
+    ...             tabular_data=csv_file_path, 
     ...             tabular_column="steel", 
     ...             variable_name="railtract_steel", 
     ...             long_name="'Railtrack Steel Mass'", 
@@ -650,20 +679,20 @@ def table_2_grid(surrogate_file, surrogate_variable, tabular_file, tabular_colum
     """
     
     # Load netcdf_file (either path or xarray.Dataset)
-    if isinstance(surrogate_file, (str, bytes, os.PathLike)):
-        input_ds = xr.open_dataset(surrogate_file)
-    elif isinstance(surrogate_file, xr.Dataset):
-        input_ds = surrogate_file
+    if isinstance(surrogate_data, (str, bytes, os.PathLike)):
+        input_ds = xr.open_dataset(surrogate_data)
+    elif isinstance(surrogate_data, xr.Dataset):
+        input_ds = surrogate_data
     else:
         raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")
 
-    # Load tabular_file (either path or pandas.DataFrame)
-    if isinstance(tabular_file, (str, bytes, os.PathLike)):
-        input_df = pd.read_csv(tabular_file)
-    elif isinstance(tabular_file, pd.DataFrame):
-        input_df = tabular_file
+    # Load tabular_data (either path or pandas.DataFrame)
+    if isinstance(tabular_data, (str, bytes, os.PathLike)):
+        input_df = pd.read_csv(tabular_data)
+    elif isinstance(tabular_data, pd.DataFrame):
+        input_df = tabular_data
     else:
-        raise TypeError("`tabular_file` must be a pandas.DataFrame or a path to a CSV file.")
+        raise TypeError("`tabular_data` must be a pandas.DataFrame or a path to a CSV file.")
     
     if variable_name is None:
         variable_name = long_name if long_name is not None else tabular_column
@@ -739,13 +768,13 @@ def table_2_grid(surrogate_file, surrogate_variable, tabular_file, tabular_colum
 
     return ds
 
-def grid_2_table(grid_file, variables=None, time=None, grid_area=None, resolution=1, aggregation=None, agg_function='sum', verbose=False):
+def grid_2_table(grid_data, variables=None, time=None, grid_area=None, resolution=1, aggregation=None, agg_function='sum', verbose=False):
     """
     Process gridded data from an xarray Dataset to generate tabular data for different jurisdictions.
 
     Parameters:
     -----------
-    - grid_file : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - grid_data : xarray.Dataset or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variables : str, optional. Variables name to be processed. It can either be one variable or list of variables. If None, all variables in the dataset (excluding predefined ones) will be considered.
     - time : str, optional. Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
     - resolution : float, optional. Resolution of gridded data in degree. Default is 1 degree.
@@ -759,7 +788,7 @@ def grid_2_table(grid_file, variables=None, time=None, grid_area=None, resolutio
     df : pandas DataFrame. Tabular data for different jurisdictions, including ISO3 codes, variable values, and optional 'Year' column.
     """
 
-    df = utils.grid_2_table(grid_file=grid_file, variables=variables, time=time, grid_area=grid_area, resolution=resolution, aggregation=aggregation, method=agg_function, verbose=verbose)
+    df = utils.grid_2_table(grid_data=grid_data, variables=variables, time=time, grid_area=grid_area, resolution=resolution, aggregation=aggregation, method=agg_function, verbose=verbose)
     return df
 
 def add_iso3_column(df, column):
@@ -840,7 +869,7 @@ def plot_histogram(dataset, variable, time=None, bin_size=30, color='blue', plot
     """
     plot.plot_histogram(dataset, variable, time, bin_size, color, plot_title, x_label, remove_outliers, log_transform, output_dir, filename)
     
-def plot_scatter(variable1, variable2, dataset, dataset2=None, time=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
+def plot_scatter(dataset, variable1, variable2, dataset2=None, time=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
     """
     Create a scatter plot for two variables in an xarray dataset.
     Optionally remove outliers and apply log transformations.
@@ -867,9 +896,9 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, time=None, color=
 
     Example
     -------
-    >>> plot_scatter(variable1="roads_gross", 
+    >>> plot_scatter(dataset=ds_road, 
+    ...             variable1="roads_gross", 
     ...             variable2="buildings_gross", 
-    ...             dataset=ds_road, 
     ...             dataset2=ds_build, 
     ...             color='blue',
     ...             plot_title="Building vs Road", 
@@ -878,7 +907,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, time=None, color=
     ...             log_transform_2="log10"
     ... )
     """
-    plot.plot_scatter(variable1, variable2, dataset, dataset2, time, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename)
+    plot.plot_scatter(dataset, variable1, variable2, dataset2, time, color, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, equation, output_dir, filename)
     
 def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', color='blue', plot_label='Area Plot', x_label='Year', y_label='Value', plot_title='Time Series Plot', smoothing_window=None, output_dir=None, filename=None):
     """
@@ -916,15 +945,15 @@ def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', co
     
     plot.plot_time_series(dataset, variable, agg_function, plot_type, color, plot_label, x_label, y_label, plot_title, smoothing_window, output_dir, filename)
 
-def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, time=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
+def plot_hexbin(dataset, variable1, variable2, dataset2=None, time=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
     
     """
     Create a hexbin plot for two variables in an xarray dataset.
 
     Parameters:
+    - dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by `variable1`, which will be used for the x-axis.
     - variable1 : str, name of the variable to be plotted on the x-axis. Must be present in `dataset`.
     - variable2 : str, name of the variable to be plotted on the y-axis. If `dataset2` is provided, this variable will be extracted from `dataset2`; otherwise, it must exist in `dataset`.
-    - dataset : xarray.Dataset or str, the primary dataset or a path to a NetCDF file. This dataset must contain the variable specified by `variable1`, which will be used for the x-axis.
     - dataset2 : xarray.Dataset or str, optional, a second dataset or a path to a NetCDF file containing the variable specified by `variable2` (for the y-axis). If not provided, `dataset` will be used for both variables.
     - time: str, optional, the time slice to plot.
     - color: str, optional, the color map of the hexbin plot.
@@ -942,26 +971,26 @@ def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, time=None, co
     - None, displays the map and optionally saves it to a file.
     Example
     -------
-    >>> plot_hexbin(variable1="roads_gross", 
+    >>> plot_hexbin(dataset=ds_road, 
+    ...             variable1="roads_gross", 
     ...             variable2="buildings_gross", 
-    ...             dataset=ds_road, 
     ...             dataset2=ds_build, 
     ...             color='blue', 
     ...             plot_title="Building vs Road"
     ... )
     """
     
-    plot.plot_hexbin(variable1, variable2, dataset, dataset2, time, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename)
+    plot.plot_hexbin(dataset, variable1, variable2, dataset2, time, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename)
     
-def plot_map(variable, dataset, time=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
+def plot_map(dataset, variable, time=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
     
     """
     Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
 
     Parameters
     ----------
-    - variable : str. Name of the variable in the xarray Dataset to plot.
     - dataset : xarray.Dataset. or str. xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
+    - variable : str. Name of the variable in the xarray Dataset to plot.
     - color : str, default 'hot_r'. Matplotlib colormap name for the plot (discrete color scale).
     - title : str, default ''. Title of the map.
     - label : str, default ''. Label for the colorbar.
@@ -991,8 +1020,8 @@ def plot_map(variable, dataset, time=None, color='hot_r', title='', label='', vm
     Example
     -------
     >>> plot_map(
-    ...     variable='npp',
     ...     dataset=ds.isel(time=-1),
+    ...     variable='npp',
     ...     vmin=0,
     ...     vmax=1200,
     ...     extend_max=True,
@@ -1005,18 +1034,18 @@ def plot_map(variable, dataset, time=None, color='hot_r', title='', label='', vm
     ... )
     """
     
-    ax = plot.plot_map(variable=variable, dataset=dataset, time=time, color=color, title=title, label=label,
+    ax = plot.plot_map(dataset=dataset, variable=variable, time=time, color=color, title=title, label=label,
              vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max, levels=levels, 
              out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, show=show)
     return ax
 
-def plot_country(tabular_file, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
+def plot_country(tabular_data, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
     """
     Plots a choropleth map of countries using a specified data column and a world shapefile.
 
     Parameters:
     -----------
-    - tabular_file : pandas.DataFrame or str. Input table containing country-level data. Can be either:
+    - tabular_data : pandas.DataFrame or str. Input table containing country-level data. Can be either:
         - A pandas DataFrame with the required `column`
         - A string path to a CSV file, which will be automatically read into a DataFrame
     - column : str. Name of the column in the dataframe to visualize.
@@ -1039,7 +1068,7 @@ def plot_country(tabular_file, column, title="", label="", color='viridis', leve
 
     Example
     -------
-    >>> plot_country(tabular_file="country_data.csv", 
+    >>> plot_country(tabular_data="country_data.csv", 
     ...             column="population", 
     ...             title="Population of Countries", 
     ...             label="Population", 
@@ -1047,7 +1076,7 @@ def plot_country(tabular_file, column, title="", label="", color='viridis', leve
     ... )
     """
 
-    plot.plot_country(tabular_file=tabular_file, column=column, title=title, label=label, color=color, levels=levels, output_dir=output_dir, filename=filename, remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max)
+    plot.plot_country(tabular_data=tabular_data, column=column, title=title, label=label, color=color, levels=levels, output_dir=output_dir, filename=filename, remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max)
             
 def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
 
@@ -1071,14 +1100,14 @@ def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
     -------
     >>> sum_variables(dataset=ds, 
     ...              variables=["roads_gross", "buildings_gross"], 
-    ...              new_variable_name="total_gross"
+    ...              new_variable_name="gross_mass"
     ... )
     """
     
     ds = calculate.sum_variables(dataset, variables, new_variable_name, time)
     return ds
     
-def subtract_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
+def subtract_variables(dataset, variable1, variable2, new_variable_name=None, time=None):
     
     """
     Subtract one variable from another in the xarray dataset.
@@ -1086,9 +1115,9 @@ def subtract_variables(variable1, variable2, dataset, new_variable_name=None, ti
     
     Parameters:
     -----------
+    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - variable1: str, the name of the variable to subtract from.
     - variable2: str, the name of the variable to subtract.
-    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - new_variable_name: str, optional, the name of the new variable to store the result.
     - time: optional, a specific time slice to select from the dataset.
     
@@ -1098,25 +1127,25 @@ def subtract_variables(variable1, variable2, dataset, new_variable_name=None, ti
 
     Example
     -------
-    >>> subtract_variables(variable1="precipitation", 
+    >>> subtract_variables(dataset=ds,
+    ...                   variable1="precipitation", 
     ...                   variable2="evaporation", 
-    ...                   dataset=ds, 
     ...                   new_variable_name="net_water_gain"
     ... )
     """
     ds = calculate.subtract_variables(variable1, variable2, dataset, new_variable_name, time)
     return ds
     
-def divide_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
+def divide_variables(dataset,variable1, variable2, new_variable_name=None, time=None):
     """
     Divide one variable by another in the xarray dataset.
     Fill NaNs with zero before dividing, and convert resulting zeros back to NaNs.
     
     Parameters:
     -----------
+    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.    
     - variable1: str, the name of the variable to be divided (numerator).
     - variable2: str, the name of the variable to divide by (denominator).
-    - dataset: xarray.Dataset. or str, xarray dataset or a path to a NetCDF file. If a file path is provided, it will be automatically loaded into an xarray.Dataset.
     - new_variable_name: str, optional, the name of the new variable to store the result.
     - time: optional, a specific time slice to select from the dataset.
     
@@ -1126,9 +1155,9 @@ def divide_variables(variable1, variable2, dataset, new_variable_name=None, time
 
     Example
     -------
-    >>> divide_variables(variable1="roads_gross", 
+    >>> divide_variables(dataset=ds,
+    ...                  variable1="road_length", 
     ...                  variable2="grid_area", 
-    ...                  dataset=ds, 
     ...                  new_variable_name="road_density"
     ... )
     """
@@ -1213,3 +1242,102 @@ def get_netcdf_info(netcdf_file, variable_name=None):
 
     netcdf_info = get.get_netcdf_info(netcdf_file=netcdf_file, variable_name=variable_name)
     return netcdf_info
+
+def atlas(directory):
+    """
+    List all NetCDF files in a directory and count the number of variables in each.
+
+    Parameters
+    ----------
+    directory : str. Path to the directory containing NetCDF files.
+
+    Returns
+    -------
+    pd.DataFrame. A DataFrame with file names and the number of variables in each file.
+    
+    Example
+    -------
+    >>> atlas(directory)
+    """
+    records = []
+    for file in os.listdir(directory):
+        if file.endswith(".nc"):
+            filepath = os.path.join(directory, file)
+            ds = xr.open_dataset(filepath)
+            num_vars = len(ds.data_vars)
+            ds.close()
+            records.append({
+                'file_name': file,
+                'num_variables': num_vars
+            })
+    return pd.DataFrame(records)
+
+def info(data):
+    """
+    Extract metadata for each variable in a NetCDF dataset.
+
+    Parameters
+    ----------
+    - data : str, os.PathLike, or xarray.Dataset. Path to a NetCDF file or an xarray.Dataset object.
+
+    Returns
+    -------
+    - pd.DataFrame. A DataFrame containing variable names, long names, units, sources, time range (start and end), time resolution (step), and depth values (if present as a variable).
+    
+    Example
+    -------
+    >>> info(netcdf_path)
+    """
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(data, (str, bytes, os.PathLike)):
+        ds = xr.open_dataset(data)
+    elif isinstance(data, xr.Dataset):
+        ds = data
+    else:
+        raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")  
+
+    records = []
+    for var_name, da in ds.data_vars.items():
+        var_attrs = da.attrs
+        # Handle time and depth dimensions if they exist
+        time_summary = depth_summary = None
+
+        if 'time' in da.dims:
+            if np.issubdtype(da['time'].dtype, np.datetime64):
+                time_values = pd.to_datetime(da['time'].values.flatten())
+                unique_times = np.unique(time_values)
+                time_diffs = np.diff(unique_times)
+                time_step = utils.detect_time_step(time_diffs) if len(unique_times) > 1 else None
+                time_summary = {
+                    'min': pd.to_datetime(unique_times.min()).strftime('%Y-%m-%d'),
+                    'max': pd.to_datetime(unique_times.max()).strftime('%Y-%m-%d'),
+                    'step': time_step
+                }
+            else:
+                unique_times = np.unique(da['time'].values.flatten())
+                time_summary = {
+                    'min': int(unique_times.min()),
+                    'max': int(unique_times.max()),
+                    'step': 'Monthly' if set(unique_times).issubset(set(range(1, 13))) else 'Unknown'
+                }
+
+        if 'depth' in da.dims and 'depth' in ds.variables:
+            depth_values = ds['depth'].values.flatten()
+            unique_depths = np.unique(depth_values)
+            depth_summary = {
+                'values': unique_depths.tolist()
+            }
+
+        records.append({
+            'variable': var_name,
+            'long_name': var_attrs.get('long_name', 'N/A'),
+            'units': var_attrs.get('units', 'N/A'),
+            'source': var_attrs.get('source', 'N/A'),
+            'time_min': time_summary['min'] if time_summary else None,
+            'time_max': time_summary['max'] if time_summary else None,
+            'time_step': time_summary['step'] if time_summary else None,
+            'depth': depth_summary['values'] if depth_summary else None
+        })
+
+    ds.close()
+    return pd.DataFrame(records)

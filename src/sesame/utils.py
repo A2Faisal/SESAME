@@ -15,9 +15,13 @@ from rasterio.transform import from_origin
 from pyproj import CRS, Transformer
 from shapely.geometry import box
 
-from . import create
-from . import calculate
-from . import get
+# from . import create
+# from . import calculate
+# from . import get
+
+import create
+import calculate
+import get
 
 
 import warnings
@@ -705,7 +709,7 @@ def poly_intersect(poly_gdf, polygons_gdf, variable_name, long_name, units, sour
 
 
 
-def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
+def netcdf_2_tif(raster_data, netcdf_variable, time=None):
     """
     Convert NetCDF data to a TIFF file. Handles multidimensional data and specific times.
     Ensures proper projection and cell size.
@@ -726,11 +730,16 @@ def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
     str
         File path to the generated TIFF file.
     """
+    # Load netcdf_file (either path or xarray.Dataset)
+    if isinstance(raster_data, (str, bytes, os.PathLike)):
+        ds = xr.open_dataset(raster_data)
+    elif isinstance(raster_data, xr.Dataset):
+        ds = raster_data
+    else:
+        raise TypeError("`raster_data` must be an xarray.Dataset or a path to a NetCDF file.")
     # create a temp path
-    temp_path = create.create_temp_folder(netcdf_path, folder_name="temp")
     
-    # Open the NetCDF file with xarray
-    ds = xr.open_dataset(netcdf_path)
+    temp_path = create.create_temp_folder(folder_name="temp")
     
     # Select the variable
     data = ds[netcdf_variable]
@@ -744,7 +753,7 @@ def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
     array = data.values
     
     # identify lat, lon variables
-    x_dimension, y_dimension = get.identify_lat_lon_names(netcdf_path)
+    x_dimension, y_dimension = get.identify_lat_lon_names(raster_data)
     # Extract latitude and longitude from dataset
     lon = ds[x_dimension].values
     lat = ds[y_dimension].values
@@ -792,8 +801,7 @@ def netcdf_2_tif(netcdf_path, netcdf_variable, time=None):
     with rasterio.open(output_raster, 'w', **metadata) as dst:
         dst.write(array, 1)
     
-    return output_raster
-
+    return output_raster, temp_path
 
 
 def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
@@ -828,11 +836,11 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
             # If the CRS is already WGS84, only maintain the extent
             src_crs = src.crs
             src_transform = src.transform
-            src_res = (src_transform[0], src_transform[4])  # (pixel_width, pixel_height)
+            src_res = (abs(src_transform[0]), abs(src_transform[4]))  # (pixel_width, pixel_height)
 
             # Calculate the dimensions of the output raster based on the extent and input resolution
-            dst_width = int((dst_extent[2] - dst_extent[0]) / src_res[0])
-            dst_height = int((dst_extent[3] - dst_extent[1]) / abs(src_res[1]))
+            dst_width = round((dst_extent[2] - dst_extent[0]) / src_res[0])
+            dst_height = round((dst_extent[3] - dst_extent[1]) / abs(src_res[1]))
 
             # Calculate the transform for the output raster
             dst_transform = from_bounds(*dst_extent, dst_width, dst_height)
@@ -876,9 +884,10 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
 
             # If needed, reapply the extent based on the output of reprojection
             # Adjust the resolution to fit the new extent
-            src_res = (transform[0], transform[4])
-            dst_width = int((dst_extent[2] - dst_extent[0]) / src_res[0])
-            dst_height = int((dst_extent[3] - dst_extent[1]) / abs(src_res[1]))
+            # src_res = (abs(src_transform[0]), abs(src_transform[4]))
+            src_res = (abs(transform[0]), abs(transform[4]))
+            dst_width = round((dst_extent[2] - dst_extent[0]) / src_res[0])
+            dst_height = round((dst_extent[3] - dst_extent[1]) / abs(src_res[1]))
             dst_transform = from_bounds(*dst_extent, dst_width, dst_height)
 
             # Create a new array for the final extent
@@ -1099,7 +1108,6 @@ def compute_weighted_statistics(gdf, stat='sum'):
     return result
 
 
-
 def tif_2_ds(input_raster, variable_name, agg_function, long_name, units="value/grid-cell", source=None, resolution=1,
                      time=None, padding="symmetric", zero_is_value=False, normalize_by_area=False, verbose=False):
     
@@ -1172,21 +1180,21 @@ def delete_temporary_folder(folder_path):
         
         # Delete the folder and its contents
         shutil.rmtree(folder_path)
-        print(f"Successfully deleted the folder: {folder_path}")
+        # print(f"Successfully deleted the folder: {folder_path}")
     except Exception as e:
         print(f"Error deleting the folder: {e}")
 
 
-def grid_2_table(grid_file=None, variables=None, time=None, grid_area=False, resolution=1, aggregation=None, method='sum', verbose=False):
+def grid_2_table(grid_data=None, variables=None, time=None, grid_area=False, resolution=1, aggregation=None, method='sum', verbose=False):
     
     base_directory = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_directory, "data")
     
     # Load netcdf_file (either path or xarray.Dataset)
-    if isinstance(grid_file, (str, bytes, os.PathLike)):
-        ds = xr.open_dataset(grid_file)
-    elif isinstance(grid_file, xr.Dataset):
-        ds = grid_file
+    if isinstance(grid_data, (str, bytes, os.PathLike)):
+        ds = xr.open_dataset(grid_data)
+    elif isinstance(grid_data, xr.Dataset):
+        ds = grid_data
     else:
         raise TypeError("`netcdf_file` must be an xarray.Dataset or a path to a NetCDF file.")
 
@@ -1382,3 +1390,18 @@ def convert_iso3_by_year(df, year):
     return df_copy
 
 
+def detect_time_step(diffs):
+    median_diff = np.median(diffs)
+    seconds = median_diff / np.timedelta64(1, 's')
+    if np.isclose(seconds, 86400, atol=3600):
+        return 'Daily'
+    elif np.isclose(seconds, 2628000, atol=86400):
+        return 'Monthly'
+    elif np.isclose(seconds, 31536000, atol=86400):
+        return 'Yearly'
+    elif seconds < 3600:
+        return 'Hourly or Less'
+    else:
+        return f'{seconds} seconds'
+    
+    

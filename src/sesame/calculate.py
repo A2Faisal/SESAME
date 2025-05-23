@@ -186,7 +186,7 @@ def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
     return summed_dataset
 
 
-def subtract_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
+def subtract_variables(dataset,variable1, variable2, new_variable_name=None, time=None):
     # Load dataset (accept path or xarray.Dataset)
     if isinstance(dataset, (str, bytes, os.PathLike)):
         dataset = xr.open_dataset(dataset)
@@ -225,7 +225,7 @@ def subtract_variables(variable1, variable2, dataset, new_variable_name=None, ti
     return result_dataset
 
 
-def divide_variables(variable1, variable2, dataset, new_variable_name=None, time=None):
+def divide_variables(dataset, variable1, variable2, new_variable_name=None, time=None):
     
     # Load dataset (accept path or xarray.Dataset)
     if isinstance(dataset, (str, bytes, os.PathLike)):

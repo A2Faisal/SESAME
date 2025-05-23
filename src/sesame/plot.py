@@ -83,8 +83,8 @@ def plot_histogram(dataset, variable, time=None, bin_size=30, color='blue', plot
         plt.savefig(save_path, dpi=600, bbox_inches='tight')
     
     plt.show()
-
-def plot_scatter(variable1, variable2, dataset, dataset2=None, time=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
+    
+def plot_scatter(dataset, variable1, variable2, dataset2=None, time=None, color='blue', x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, equation=False, output_dir=None, filename=None):
 
     # Load dataset1
     if isinstance(dataset, (str, bytes, os.PathLike)):
@@ -206,7 +206,7 @@ def plot_scatter(variable1, variable2, dataset, dataset2=None, time=None, color=
         plt.savefig(save_path, dpi=600, bbox_inches='tight')
     plt.show()
 
-def plot_hexbin(variable1, variable2, dataset=None, dataset2=None, time=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
+def plot_hexbin(dataset, variable1, variable2, dataset2=None, time=None, color='pink_r', grid_size=30, x_label=None, y_label=None, plot_title=None, remove_outliers=False, log_transform_1=None, log_transform_2=None, output_dir=None, filename=None):
     
     # Load dataset1
     if isinstance(dataset, (str, bytes, os.PathLike)):
@@ -391,7 +391,7 @@ def plot_time_series(dataset, variable, agg_function='sum', plot_type='both', co
         plt.savefig(save_path, dpi=600, bbox_inches='tight')
     plt.show()
 
-def plot_map(variable, dataset, time=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
+def plot_map(dataset, variable, time=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
     
     # Load netcdf_file (either path or xarray.Dataset)
     if isinstance(dataset, (str, bytes, os.PathLike)):
@@ -495,18 +495,18 @@ def plot_map(variable, dataset, time=None, color='hot_r', title='', label='', vm
         
     return ax
 
-def plot_country(tabular_file, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
+def plot_country(tabular_data, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
 
-    # Handle tabular_file input
-    if isinstance(tabular_file, pd.DataFrame):
-        dataframe = tabular_file
-    elif isinstance(tabular_file, (str, bytes, os.PathLike)):
+    # Handle tabular_data input
+    if isinstance(tabular_data, pd.DataFrame):
+        dataframe = tabular_data
+    elif isinstance(tabular_data, (str, bytes, os.PathLike)):
         try:
-            dataframe = pd.read_csv(tabular_file, encoding='utf-8')
+            dataframe = pd.read_csv(tabular_data, encoding='utf-8')
         except UnicodeDecodeError:
-            dataframe = pd.read_csv(tabular_file, encoding='latin1')
+            dataframe = pd.read_csv(tabular_data, encoding='latin1')
     else:
-        raise TypeError("`tabular_file` must be a pandas DataFrame or a path to a CSV file.")
+        raise TypeError("`tabular_data` must be a pandas DataFrame or a path to a CSV file.")
 
     if remove_ata:
         dataframe = dataframe[dataframe['ISO3'] != 'ATA']

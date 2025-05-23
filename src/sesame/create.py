@@ -8,8 +8,11 @@ import numpy as np
 import xarray as xr
 
 
-from . import calculate
-from . import utils
+# from . import calculate
+# from . import utils
+
+import calculate
+import utils
 
 
 import warnings
@@ -155,6 +158,30 @@ def create_temp_folder(input_path, folder_name="temp"):
         os.makedirs(path)
     path = os.path.join(path, '')
     return path
+
+
+def create_temp_folder(folder_name="temp"):
+    """
+    Create a temporary folder in the directory where the script is located.
+
+    Parameters
+    ----------
+    folder_name : str, optional
+        The name of the temporary folder to be created. Default is "temp".
+
+    Returns
+    -------
+    str
+        The path to the created or existing temporary folder.
+    """
+    # Get the directory where the current script is located
+    script_dir = os.path.join(os.getcwd())
+    temp_path = os.path.join(script_dir, folder_name)
+
+    if not os.path.exists(temp_path):
+        os.makedirs(temp_path)
+
+    return os.path.join(temp_path, '')
 
 
 def create_new_ds(input_ds, tabular_column, country_ds, netcdf_variable, input_df, verbose):
