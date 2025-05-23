@@ -17,7 +17,7 @@ Whether you’re a researcher, student, or enthusiast, SESAME helps you unlock i
 2. Download the Human-Earth Atlas ([Figshare Link](https://doi.org/10.6084/m9.figshare.28432499))
 3. Load your spatial data (e.g., land cover, population, climate)
 4. Use SESAME’s plotting tools to visualize and compare datasets
-5. Explore the Human-Earth Atlas by overlaying your data with global reference layers
+5. Explore spatial and temporal patterns among hundreds of variables in the Human-Earth Atlas.
 
 *Note: SESAME may take up to 2 minutes to load when used for the first time. This will not recur with further use.
 
