@@ -59,7 +59,7 @@ conda activate sesame_env
 # install pip
 conda install pip
 # install SESAME from testPyPI
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.1
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.2
 ```
 ### Step 2: Add this as a Python code snippet:
 ```bash
