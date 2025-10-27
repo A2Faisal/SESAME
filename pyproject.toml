@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "sesame-iesd"
+version = "0.1.4"
+description = "A simple Python package for SESAME toolbox"
+authors = [
+    "Abdullah Al Faisal <abdullah.al.faisal@mail.mcgill.ca>",
+    "Maxwell Kaye <maxwell.kaye@mail.mcgill.ca>"
+]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "sesame", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+geopandas = "1.0.1"
+xarray = "2024.6.0"
+h5netcdf = "1.3.0"
+rasterio = "1.3.10"
+matplotlib = "3.9.1"
+seaborn = "0.13.2"
+scipy = "1.14.0"
+cartopy = "0.23.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
