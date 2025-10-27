@@ -56,10 +56,11 @@ If you're using **conda** to manage your Python environment:
 conda create -n sesame_env
 # activate the environment
 conda activate sesame_env
-# install pip
-conda install pip
+
+# Install geospatial dependencies via conda
+conda install -c conda-forge gdal rasterio cartopy geopandas
 # install SESAME from testPyPI
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.4
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.7
 ```
 ### Step 2: Add this as a Python code snippet:
 ```bash
