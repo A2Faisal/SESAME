@@ -57,10 +57,10 @@ conda create -n sesame_env
 # activate the environment
 conda activate sesame_env
 
-# Install geospatial dependencies via conda
-conda install -c conda-forge gdal rasterio cartopy geopandas
+# Install all geospatial dependencies via conda
+conda install -c conda-forge gdal rasterio cartopy geopandas h5netcdf matplotlib
 # install SESAME from testPyPI
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.7
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple sesame-iesd==0.1.9
 ```
 ### Step 2: Add this as a Python code snippet:
 ```bash
