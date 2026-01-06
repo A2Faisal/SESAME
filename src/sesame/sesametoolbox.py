@@ -782,7 +782,7 @@ def grid_2_table(grid_data, variables=None, time=None, grid_area=None, resolutio
     - time : str, optional. Time slice for data processing. If provided, the nearest time slice is selected. If None, a default time slice is used.
     - resolution : float, optional. Resolution of gridded data in degree. Default is 1 degree.
     - grid_area : str, optional. Indicator to consider grid area during processing. If 'YES', the variable is multiplied by grid area.
-    - aggregation : str, optional. Aggregation level for tabular data. If 'continent', the data will be aggregated at the continent level.
+    - aggregation : str, optional. Aggregation level for tabular data. If 'region_1', 'region_2', or 'region_3', the data will be aggregated at the corresponding regional level.
     - agg_function : str, optional, default 'sum'. Aggregation method. Options: 'sum', 'mean', 'max', 'min', 'std'.  
     - verbose : bool, optional. If True, the function will print the global sum of values before and after aggregation.
 
@@ -985,7 +985,7 @@ def plot_hexbin(dataset, variable1, variable2, dataset2=None, time=None, color='
     
     plot.plot_hexbin(dataset, variable1, variable2, dataset2, time, color, grid_size, x_label, y_label, plot_title, remove_outliers, log_transform_1, log_transform_2, output_dir, filename)
     
-def plot_map(dataset, variable, time=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=False, extend_max=False, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
+def plot_map(dataset, variable, time=None, depth=None, color='hot_r', title='', label='', vmin=None, vmax=None, extend_min=None, extend_max=None, levels=10, out_bound=True, remove_ata=False, output_dir=None, filename=None, show=True):
     
     """
     Plots a 2D map of a variable from an xarray Dataset or NetCDF file with customizable colorbar, projection, and map appearance.
@@ -998,10 +998,11 @@ def plot_map(dataset, variable, time=None, color='hot_r', title='', label='', vm
     - title : str, default ''. Title of the map.
     - label : str, default ''. Label for the colorbar.
     - time: str, optional, the time slice to plot.
+    - depth: str, optional, the depth slice to plot.
     - vmin : float, optional. Minimum data value for the colorbar range. If not provided, the minimum of the variable is used.
     - vmax : float, optional. Maximum data value for the colorbar range. If not provided, the maximum of the variable is used.
-    - extend_min : bool, default False. If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
-    - extend_max : bool, default False. If True, includes values above `vmax` in the last color class and shows a right arrow on the colorbar.
+    - extend_min : bool or None, default None. If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
+    - extend_max : bool or None, default None. If True, includes values above `vmax` in the last color class and shows a right arrow on the colorbar.
     - levels : int or list of float, default 10. Either the number of color intervals or a list of explicit interval boundaries.
     - out_bound : bool, default True. Whether to display the outer boundary (spine) of the map projection.
     - remove_ata : bool, default False. If True, removes Antarctica from the map by excluding data below 60°S latitude.
@@ -1019,6 +1020,7 @@ def plot_map(dataset, variable, time=None, color='hot_r', title='', label='', vm
         
     Returns:
     - Axes class of the map, optionally displays the map and saves it to a file.
+    - Formats a discrete colorbar by always labeling all bin boundaries, automatically using scientific notation for large or small values while avoiding unnecessary ×10⁰ scaling.
 
     Example
     -------
@@ -1037,12 +1039,12 @@ def plot_map(dataset, variable, time=None, color='hot_r', title='', label='', vm
     ... )
     """
     
-    ax = plot.plot_map(dataset=dataset, variable=variable, time=time, color=color, title=title, label=label,
+    ax = plot.plot_map(dataset=dataset, variable=variable, time=time, depth=depth, color=color, title=title, label=label,
              vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max, levels=levels, 
              out_bound=out_bound, remove_ata=remove_ata, output_dir=output_dir, filename=filename, show=show)
     return ax
 
-def plot_country(tabular_data, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=False, extend_max=False):
+def plot_country(tabular_data, column, title="", label="", color='viridis', levels=10, output_dir=None, filename=None, remove_ata=False, out_bound=True, vmin=None, vmax=None, extend_min=None, extend_max=None, show=True):
     """
     Plots a choropleth map of countries using a specified data column and a world shapefile.
 
@@ -1060,14 +1062,16 @@ def plot_country(tabular_data, column, title="", label="", color='viridis', leve
     - out_bound : bool, optional. Whether to display map boundaries (spines). Default is True.
     - vmin : float or None, optional. Minimum value for the colormap. If None, calculated from the data.
     - vmax : float or None, optional. Maximum value for the colormap. If None, calculated from the data.
-    - extend_min : bool, optional. Whether to extend the colorbar below `vmin`. Default is False.
-    - extend_max : bool, optional. Whether to extend the colorbar above `vmax`. Default is False.
+    - extend_min : bool or None, default None. If True, includes values below `vmin` in the first color class and shows a left arrow on the colorbar.
+    - extend_max : bool or None, default None. If True, includes values above `vmax` in the last color class and shows a right arrow on the colorbar.
     - output_dir : str, optional. Directory path to save the output figure. If not provided, the figure is saved in the current working directory.
     - filename : str, optional. Filename (with extension) for saving the figure. If not provided, the plot is saved as "output_country_plot.png".
+    - show : bool, True. Whether or not show the map
 
     Returns:
     --------
     - None, displays the map and optionally saves it to a file.
+    - Formats a discrete colorbar by always labeling all bin boundaries, automatically using scientific notation for large or small values while avoiding unnecessary ×10⁰ scaling.
 
     Example
     -------
@@ -1079,7 +1083,9 @@ def plot_country(tabular_data, column, title="", label="", color='viridis', leve
     ... )
     """
 
-    plot.plot_country(tabular_data=tabular_data, column=column, title=title, label=label, color=color, levels=levels, output_dir=output_dir, filename=filename, remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max)
+    ax = plot.plot_country(tabular_data=tabular_data, column=column, title=title, label=label, color=color, levels=levels, output_dir=output_dir, filename=filename, remove_ata=remove_ata, out_bound=out_bound, vmin=vmin, vmax=vmax, extend_min=extend_min, extend_max=extend_max, show=show)
+    
+    return ax
             
 def sum_variables(dataset, variables=None, new_variable_name=None, time=None):
 
