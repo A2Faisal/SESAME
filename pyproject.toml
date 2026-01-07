@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sesame-iesd"
-version = "0.1.9"
+version = "0.1.10"
 description = "A simple Python package for SESAME toolbox"
 authors = [
     "Abdullah Al Faisal <abdullah.al.faisal@mail.mcgill.ca>",
