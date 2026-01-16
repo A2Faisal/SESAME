@@ -59,7 +59,7 @@ conda activate sesame_env
 # Install all geospatial dependencies via conda
 conda install -c conda-forge gdal rasterio cartopy geopandas h5netcdf matplotlib
 
-# install SESAME from testPyPI
+# install SESAME from PyPI
 pip install sesame-iesd
 ```
 ### Step 2: Add this as a Python code snippet:
