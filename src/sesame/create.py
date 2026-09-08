@@ -135,31 +135,6 @@ def create_global_xarray_dataset(pixel_width_deg, pixel_height_deg):
     
     return ds
 
-def create_temp_folder(input_path, folder_name="temp"):
-    """
-    Create a temporary folder in the parent directory of the input path.
-
-    Parameters
-    ----------
-    input_path : str
-        The input path to determine the parent directory.
-    folder_name : str, optional
-        The name of the temporary folder to be created. Default is "temp".
-
-    Returns
-    -------
-    str
-        The path to the created or existing temporary folder.
-    """    
-    parent_dir = os.path.dirname(os.path.dirname(input_path))
-    path = os.path.join(parent_dir, folder_name)
-
-    if not os.path.exists(path):
-        os.makedirs(path)
-    path = os.path.join(path, '')
-    return path
-
-
 def create_temp_folder(folder_name="temp"):
     """
     Create a temporary folder in the directory where the script is located.
