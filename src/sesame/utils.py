@@ -1057,8 +1057,8 @@ def raster_to_polygon_gdf(raster_file):
             for j in range(src.width):
                 if mask[i, j]:
                     # Calculate the bounds of the pixel
-                    left = src.transform * (j, i)
-                    right = src.transform * (j + 1, i + 1)
+                    left = src.transform @ (j, i)
+                    right = src.transform @ (j + 1, i + 1)
                     polygon = box(left[0], left[1], right[0], right[1])
                     geometries.append(polygon)
                     values.append(array[i, j])
