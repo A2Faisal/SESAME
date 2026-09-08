@@ -24,6 +24,17 @@ cartopy = "^0.23.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
+ruff = "*"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Default rule set (E4, E7, E9, F) plus unused-import/variable checks.
+# NOTE: the existing codebase does not pass this yet (tracked separately,
+# see issue for the pre-existing findings). Run `ruff check .` locally to
+# see current violations; this section defines the target, not yet a CI gate.
+select = ["E4", "E7", "E9", "F"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
