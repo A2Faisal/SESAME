@@ -49,7 +49,7 @@ def _assert_matches_reference(new_ds, reference_filename, max_nan_mismatch=0):
             f"'{var}' has {n_mismatch} cells where NaN-ness differs between "
             f"the reference and the new run (allowed: {max_nan_mismatch})"
         )
-      # Where both sides are non-NaN, values must match closely.
+        # Where both sides are non-NaN, values must match closely.
         both_finite = ~np.isnan(expected) & ~np.isnan(actual)
         np.testing.assert_allclose(
             expected[both_finite], actual[both_finite], rtol=1e-6, atol=1e-6,
