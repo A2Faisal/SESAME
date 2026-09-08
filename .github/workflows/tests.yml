@@ -5,18 +5,23 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+env:
+  # actions/setup-python (all current majors) emits a Node-level `punycode`
+  # deprecation warning on Ubuntu runners. This is an open upstream issue
+  # (actions/setup-python#1208, #1252), not something fixable from this
+  # workflow, so it is suppressed here rather than left as noise.
+  NODE_OPTIONS: --no-deprecation
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
+        uses: actions/setup-python@v6
+       with:
           python-version: "3.11"
-
       # SESAME depends on geopandas/rasterio/cartopy, which need GDAL, GEOS,
       # and PROJ system libraries. This mirrors the README's conda-based
       # install instructions, but via apt since this job doesn't use conda.
