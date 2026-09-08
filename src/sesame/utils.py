@@ -368,12 +368,6 @@ def determine_units_line(units, normalize_by_area):
         return "m m-2"
     return units
 
-def determine_long_name_line(agg_column, variable_name, long_name, agg_function):
-    if long_name is None:
-        if agg_column is None or (agg_function is not None and agg_function.lower() == 'sum'):
-            return reverse_replace_special_characters(variable_name) if variable_name else reverse_replace_special_characters(f"length_{agg_function.lower()}")
-    return long_name if long_name else reverse_replace_special_characters(f"length_{agg_function.lower()}")
-
 def determine_long_name_line(long_name, agg_column, variable_name):
     if long_name is None:
         if variable_name:
@@ -386,8 +380,9 @@ def determine_long_name_line(long_name, agg_column, variable_name):
 def dataframe_stats_line(dataframe, agg_column=None, agg_function="sum"):
     if agg_function.lower() == "sum":
         if agg_column is None:
-            global_summary_stats = dataframe[variable_name].sum()
-            return global_summary_stats
+            dataframe = calculate.calculate_geometry_attributes(dataframe)
+            global_summary_stats = dataframe["length_m"].sum()
+            return global_summary_stats * 1e-3
         else:
             variable_name = agg_column or "length_m"
             dataframe = calculate.calculate_geometry_attributes(dataframe)
@@ -461,43 +456,6 @@ def save_to_nc(ds, output_directory=None, output_filename=None, base_filename=No
         else:
             ds.to_netcdf(output_directory + base_filename + ".nc")
             
-def point_spatial_join(polygons_gdf, points_gdf, agg_column=None, agg_function='sum', x_offset=0.0001, y_offset=0.0001):
-    # Adjust points to ensure they are within or correctly intersecting polygons
-    points_gdf = adjust_points(points_gdf, polygons_gdf, x_offset, y_offset)
-    
-    # Perform spatial join with 'intersects' operation
-    points_within_polygons = gpd.sjoin(points_gdf, polygons_gdf, predicate='intersects')
-    
-    # If field_name is provided, convert the column to numeric
-    if agg_column:
-        points_within_polygons[agg_column] = pd.to_numeric(points_within_polygons[agg_column], errors='coerce')
-        variable_name = replace_special_characters(agg_column)
-        # Group by polygon and compute summary statistic based on operation
-        if agg_function.lower() == 'sum':
-            summary_stats = points_within_polygons.groupby('index_right')[agg_column].sum().reset_index(name=variable_name)
-        elif agg_function.lower() == 'mean':
-            summary_stats = points_within_polygons.groupby('index_right')[agg_column].mean().reset_index(name=variable_name)
-        elif agg_function.lower() == 'max':
-            summary_stats = points_within_polygons.groupby('index_right')[agg_column].max().reset_index(name=variable_name)
-        elif agg_function.lower() == 'min':
-            summary_stats = points_within_polygons.groupby('index_right')[agg_column].min().reset_index(name=variable_name)            
-        elif agg_function.lower() == 'std':
-            summary_stats = points_within_polygons.groupby('index_right')[agg_column].std().reset_index(name=variable_name)
-        else:
-            raise ValueError(f"Unsupported operation: {agg_column}. Choose from 'sum', 'mean', 'max', 'std'.")
-    
-        # Merge summary statistics with polygons GeoDataFrame
-        polygons_gdf = polygons_gdf.merge(summary_stats, how='left', left_index=True, right_on='index_right')
-        print(polygons_gdf[variable_name].sum())
-    
-    else:
-        # Count the points within each polygon
-        polygon_counts = points_within_polygons.groupby('index_right').size().reset_index(name='count')
-        # Add the count to the polygons GeoDataFrame
-        polygons_gdf['count'] = polygons_gdf.index.to_series().map(polygon_counts.set_index('index_right')['count']).fillna(0).astype(int)
-    
-    return polygons_gdf
-
 def point_spatial_join(polygons_gdf, points_gdf, agg_column=None, agg_function='sum', x_offset=0.0001, y_offset=0.0001):
     # Ensure both GeoDataFrames use the same CRS
     if polygons_gdf.crs != points_gdf.crs:
