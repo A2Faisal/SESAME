@@ -119,6 +119,11 @@ Detailed setup, usage instructions, advanced features, and testing procedures ar
 
 ---
 
+## Altas Visualization
+
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://sesame.streamlit.app/)
+
+---
 
 ## Contact
 For questions or inquiries about the SESAME project, please contact [abdullah-al.faisal@mail.mcgill.ca](mailto:abdullah-al.faisal@mail.mcgill.ca) or [maxwell.kaye@mail.mcgill.ca](mailto:maxwell.kaye@mail.mcgill.ca).
