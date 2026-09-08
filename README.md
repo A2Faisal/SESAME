@@ -1,5 +1,7 @@
 # SESAME Project
 
+[![PyPI version](https://img.shields.io/pypi/v/sesame-iesd.svg)](https://pypi.org/project/sesame-iesd/)
+
 ## About
 
 The **SESAME project** aims to unify key human and non-human (Earth system) datasets into a shared spatially-gridded format. These datasets are often siloed in incompatible formats (eg. csv, tiff, netcdf, shp, etc.); SESAME improves interdisciplinary data discoverability and interoperability for research and modeling the global human system.
@@ -47,7 +49,7 @@ The **SESAME project** aims to unify key human and non-human (Earth system) data
 
 ## Installation Instructions
 
-If you're using **conda** to manage your Python environment:
+SESAME is published on PyPI as [`sesame-iesd`](https://pypi.org/project/sesame-iesd/). If you're using **conda** to manage your Python environment:
 
 ### Step 1: Create and activate the environment
 
