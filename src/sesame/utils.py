@@ -2,17 +2,14 @@ import os
 import re
 import geopandas as gpd
 import pandas as pd
-import sys
-from shapely.geometry import Polygon, LineString, Point
-import pyproj
+from shapely.geometry import Polygon, Point
 import numpy as np
 import xarray as xr
 import rasterio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
-from rasterio.crs import CRS
 from rasterio.transform import from_bounds
 from rasterio.transform import from_origin
-from pyproj import CRS, Transformer
+from pyproj import CRS
 from shapely.geometry import box
 
 from . import create
@@ -384,7 +381,6 @@ def dataframe_stats_line(dataframe, agg_column=None, agg_function="sum"):
             global_summary_stats = dataframe["length_m"].sum()
             return global_summary_stats * 1e-3
         else:
-            variable_name = agg_column or "length_m"
             dataframe = calculate.calculate_geometry_attributes(dataframe)
             global_summary_stats = dataframe["length_m"].sum()
             return global_summary_stats * 1e-3
@@ -450,8 +446,8 @@ def xarray_dataset_stats(dataset, variable_name=None, agg_column=None, normalize
 
 
 def save_to_nc(ds, output_directory=None, output_filename=None, base_filename=None):
-    if output_directory != None:
-        if output_filename != None:
+    if output_directory is not None:
+        if output_filename is not None:
             ds.to_netcdf(output_directory + output_filename + ".nc")
         else:
             ds.to_netcdf(output_directory + base_filename + ".nc")
@@ -727,8 +723,8 @@ def netcdf_2_tif(raster_data, netcdf_variable, time=None):
     height, width = array.shape
     
     # Calculate transform based on extent and cell size
-    min_lon, max_lon = lon.min(), lon.max()
-    min_lat, max_lat = lat.min(), lat.max()
+        min_lon = lon.min()
+        max_lat = lat.max()
 
     if lat[0] < lat[-1]:
         lat = np.flip(lat)
@@ -792,7 +788,6 @@ def reproject_and_fill(input_raster, dst_extent=(-180.0, -90.0, 180.0, 90.0)):
         # Check if the CRS of the input raster is already WGS84
         if src.crs == dst_crs:
             # If the CRS is already WGS84, only maintain the extent
-            src_crs = src.crs
             src_transform = src.transform
             src_res = (abs(src_transform[0]), abs(src_transform[4]))  # (pixel_width, pixel_height)
 
