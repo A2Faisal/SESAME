@@ -1,8 +1,7 @@
 import os
-import re
 import pandas as pd
 import geopandas as gpd
-from shapely.geometry import Polygon, LineString, Point
+from shapely.geometry import Polygon, LineString
 import pyproj
 import numpy as np
 import xarray as xr
@@ -201,7 +200,7 @@ def create_new_ds(input_ds, tabular_column, country_ds, netcdf_variable, input_d
 
     # Verbose output for evenly distributed countries
     if verbose:
-        evenly_df = df[df["evenly_dis"] == True]  # Corrected filtering syntax
+        evenly_df = df[df["evenly_dis"]]
         if not evenly_df.empty:  # Check if there are any evenly distributed countries
             print(f"List of evenly distributed countries: {evenly_df['ISO3'].unique()}")
             percentage = (evenly_df["value"].sum() * 100) / df["value"].sum()
