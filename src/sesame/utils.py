@@ -723,8 +723,8 @@ def netcdf_2_tif(raster_data, netcdf_variable, time=None):
     height, width = array.shape
     
     # Calculate transform based on extent and cell size
-        min_lon = lon.min()
-        max_lat = lat.max()
+    min_lon = lon.min()
+    max_lat = lat.max()
 
     if lat[0] < lat[-1]:
         lat = np.flip(lat)
