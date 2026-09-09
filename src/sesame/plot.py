@@ -4,22 +4,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 from scipy.stats import linregress
 import matplotlib.colors as mcolors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from matplotlib.colorbar import ColorbarBase
-from matplotlib.colors import Normalize
 from matplotlib.ticker import ScalarFormatter
 import geopandas as gpd
-import cartopy.crs as ccrs
-from matplotlib.colors import ListedColormap
-import cartopy
-import seaborn as sns
 
-import numpy as np
-from matplotlib.ticker import ScalarFormatter
 
 def format_colorbar(cb, bounds, vmin=None, vmax=None):
     """
