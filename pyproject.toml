@@ -31,10 +31,13 @@ line-length = 120
 
 [tool.ruff.lint]
 # Default rule set (E4, E7, E9, F) plus unused-import/variable checks.
-# NOTE: the existing codebase does not pass this yet (tracked separately,
-# see issue for the pre-existing findings). Run `ruff check .` locally to
-# see current violations; this section defines the target, not yet a CI gate.
+# Enforced in CI (see .github/workflows/tests.yml) against src/.
 select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Intentional re-export pattern: sesame/__init__.py exposes the whole
+# sesametoolbox public API via `from .sesametoolbox import *`.
+"src/sesame/__init__.py" = ["F403"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
