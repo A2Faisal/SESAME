@@ -117,7 +117,7 @@ Faisal, A.A., Kaye, M., Ahmed, M. et al. (2025)._The SESAME Human-Earth Atlas_. 
 
 Detailed setup, usage instructions, advanced features, and testing procedures are included in the official software manual:
 
-📄 [**SESAME Software Manual (v1.1)**](https://a2faisal.github.io/SESAME/)
+📄 [**SESAME Software Manual (v1)**](https://a2faisal.github.io/SESAME/)
 
 ---
 
