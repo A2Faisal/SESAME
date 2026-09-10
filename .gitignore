@@ -1,0 +1,29 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build artifacts
+# NOTE: build/lib/sesame is already tracked in this repo as of 2026-09;
+# this only prevents it from being re-added or duplicated going forward.
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing / linting caches
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
